@@ -3,10 +3,9 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM VE STRATEJİ
+# 1. TASARIM VE STRATEJİ (Sidebardaki hizalama korundu)
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
 
-# Plotly kontrolü
 try:
     import plotly.graph_objects as go
     HAS_PLOTLY = True
@@ -27,20 +26,13 @@ st.markdown("""
         background: #2a2e39; padding: 4px 15px; font-size: 0.8rem;
         font-weight: bold; color: #848e9c; margin-top: 10px;
     }
-    
-    /* Milimetrik Hizalama Ayarı */
     .aligned-text {
         display: inline-block;
-        padding-top: 5px; /* Yazıyı aşağı iterek kutucukla hizalar */
+        padding-top: 5px; 
         font-size: 0.9rem;
         vertical-align: middle;
     }
-    
-    /* Sidebar içindeki sütunların dikey hizalanması */
-    [data-testid="stHorizontalBlock"] {
-        align-items: center;
-    }
-    
+    [data-testid="stHorizontalBlock"] { align-items: center; }
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -49,53 +41,68 @@ st.markdown("""
 DIL_VERISI = {
     "Türkçe": {
         "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
-        "ara": "Hisse Ara...", "detay": "Grafiği Göster",
-        "tr": "BIST HİSSELERİ", "us": "ABD HİSSELERİ", "sonuc": "ARAMA SONUÇLARI"
+        "ara": "Hisse Ara (Kod yazın: THYAO, AAPL...)", "detay": "Grafiği Göster",
+        "tr": "BİST TÜM HİSSELER (Öne Çıkanlar)", "us": "ABD BORSALARI (Devler)", "sonuc": "ARAMA SONUÇLARI"
     },
     "English": {
         "para": "Currency", "yenile": "Auto Refresh (15s)",
-        "ara": "Search Stock...", "detay": "Show Chart",
-        "tr": "TURKISH STOCKS", "us": "US STOCKS", "sonuc": "SEARCH RESULTS"
+        "ara": "Search (Type Code: NVDA, THYAO...)", "detay": "Show Chart",
+        "tr": "BIST ALL STOCKS", "us": "US MARKETS", "sonuc": "SEARCH RESULTS"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - TAM HİZALAMA
+# 3. YAN PANEL (SIDEBAR) - TASARIM SABİT TUTULDU
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_language")
     D = DIL_VERISI[lang]
     st.divider()
     
-    # PARA BİRİMİ SEÇİMİ
     st.write(f"**{D['para']}**")
     curr = st.radio("C_Select", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="currency_selector")
     
     st.divider()
 
-    # KUTUCUK VE YAZI AYNI HİZADA
+    # Kutucuk solda, yazı sağda milimetrik hizalama
     c1, c2 = st.columns([0.15, 0.85])
     with c1:
         refresh = st.checkbox("R_Toggle", value=True, label_visibility="collapsed", key="refresh_toggle")
     with c2:
-        # HTML ve class kullanarak metni aşağı kaydırdık
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. HİSSE LİSTELERİ
-BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
-US_LIST = sorted(["AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN"])
+# 4. GENİŞLETİLMİŞ HİSSE LİSTELERİ (Tüm popüler hisseler eklendi)
+BIST_ALL = sorted([
+    "THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", 
+    "GARAN.IS", "SASA.IS", "HEKTS.IS", "PETKM.IS", "EKGYO.IS", "HALKB.IS", "ISCTR.IS", "VAKBN.IS", 
+    "ARCLK.IS", "FROTO.IS", "TOASO.IS", "GUBRF.IS", "ASTOR.IS", "KONTR.IS", "SMRTG.IS", "YEOTK.IS",
+    "DOAS.IS", "PGSUS.IS", "TCELL.IS", "TTKOM.IS", "ENKAI.IS", "SAHOL.IS", "YKBNK.IS"
+])
+
+US_ALL = sorted([
+    "AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN", 
+    "BABA", "PLTR", "MSTR", "UBER", "PYPL", "INTC", "DIS", "NKE", "JPM", "V", "MA"
+])
 
 # 5. ARAMA MOTORU
-search_input = st.text_input("", placeholder=D['ara'], key="search_input_main").upper()
+search_input = st.text_input("", placeholder=D['ara'], key="search_main").upper()
 
 # 6. VERİ MOTORU
 @st.cache_data(ttl=3600)
 def get_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
-    except: return 34.55
+    except: return 34.50
 usd_rate = get_rate()
 
 def render_list(stock_list, is_tr):
-    filtered = [s for s in stock_list if search_input in s.replace('.IS','')]
-    for sym in filtered:
+    # Eğer arama yapılıyorsa listede olsun olmasın çekmeyi dene
+    display_list = stock_list
+    if search_input:
+        # Arama kutusuna tam kod yazıldıysa (örn: SMRTG) ve listede yoksa ekle
+        search_sym = search_input if not is_tr else f"{search_input}.IS"
+        display_list = [s for s in stock_list if search_input in s.replace('.IS','')]
+        if not display_list and len(search_input) >= 3:
+            display_list = [search_sym]
+
+    for sym in display_list:
         try:
             t = yf.Ticker(sym)
             df = t.history(period="1mo")
@@ -127,12 +134,13 @@ def render_list(stock_list, is_tr):
 # 7. ANA AKIŞ
 if search_input:
     st.markdown(f"<div class='market-header'>{D['sonuc']}</div>", unsafe_allow_html=True)
-    render_list(BIST_LIST + US_LIST, True)
+    # Hem BIST hem ABD'de ara
+    render_list(BIST_ALL + US_ALL, True) 
 else:
     st.markdown(f"<div class='market-header'>{D['tr']}</div>", unsafe_allow_html=True)
-    render_list(BIST_LIST, True)
+    render_list(BIST_ALL, True)
     st.markdown(f"<div class='market-header'>{D['us']}</div>", unsafe_allow_html=True)
-    render_list(US_LIST, False)
+    render_list(US_ALL, False)
 
 if refresh:
     time.sleep(15)
