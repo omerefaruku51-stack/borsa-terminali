@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.graph_objects as go
 import time
 
 # 1. PREMIUM UI AYARLARI
@@ -12,13 +11,14 @@ st.markdown("""
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     [data-testid="stSidebar"] { background-color: #161a25; }
     
-    /* Modern Veri Kartı */
+    /* Modern Veri Kartı - Tam Genişlik */
     .data-card {
         background: #1e222d;
         border-radius: 15px;
         padding: 25px;
         border: 1px solid #2a2e39;
         margin-bottom: 20px;
+        width: 100%; /* Tam genişlik */
     }
     
     .symbol-header { 
@@ -34,8 +34,6 @@ st.markdown("""
     .price-sub { font-size: 1.1rem; color: #848e9c; }
     
     header, footer {visibility: hidden;}
-    /* Streamlit'in varsayılan grafik yazılarını gizle */
-    .modebar { display: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -47,8 +45,7 @@ D_LIST = {
         "close": "Kapanış",
         "current": "Güncel",
         "change": "Değişim",
-        "chart_title": "7 Günlük Performans (Uygulama İçi)",
-        "detail": "🔍 Gelişmiş Teknik Analiz Panelini Aç"
+        "hata": "Veri bulunamadı"
     },
     "English": {
         "title": "STOCK TERMINAL PRO",
@@ -56,8 +53,7 @@ D_LIST = {
         "close": "Close",
         "current": "Live",
         "change": "Change",
-        "chart_title": "7-Day Performance (Native)",
-        "detail": "🔍 Open Advanced Technical Panel"
+        "hata": "Data not found"
     }
 }
 
@@ -79,14 +75,14 @@ st.title(f"🚀 {D['title']}")
 search = st.text_input(D["search"], placeholder="THYAO.IS, BTC-USD, NVDA...")
 symbols = [s.strip().upper() for s in search.split(",") if s.strip()]
 
-# 4. GÖRÜNTÜLEME
+# 4. GÖRÜNTÜLEME - KESİN TEMİZLİK
 if not symbols:
     st.info("İzleme listenize bir sembol ekleyin.")
 else:
     for sym in symbols:
         try:
             t = yf.Ticker(sym)
-            df = t.history(period="7d")
+            df = t.history(period="2d")
             if df.empty: continue
             
             p_now, p_prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
@@ -98,13 +94,12 @@ else:
             d_now = p_now * usd if ("TRY" in curr and not is_b) else (p_now / usd if ("USD" in curr and is_b) else p_now)
             d_prev = p_prev * usd if ("TRY" in curr and not is_b) else (p_prev / usd if ("USD" in curr and is_b) else p_prev)
 
-            # EKRAN TASARIMI
+            # EKRAN TASARIMI - KESİN TEMİZLİK
             st.markdown(f"<div class='symbol-header'>{sym}</div>", unsafe_allow_html=True)
             
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.markdown(f"""
+            # Yandaki grafik bloğu (col2) ve içindeki tüm grafik kodları kaldırıldı.
+            # Veri kartı tam genişlikte gösteriliyor.
+            st.markdown(f"""
                 <div class="data-card">
                     <div class="price-sub">{D['current']}</div>
                     <div class="price-main">{d_now:,.2f} {u}</div>
@@ -117,33 +112,7 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
 
-            with col2:
-                # KENDİ GRAFİĞİMİZ (Plotly - Hiçbir dış bağlantı/reklam içermez)
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df.index, y=df['Close'],
-                    mode='lines+markers',
-                    line=dict(color='#3772ff', width=3),
-                    fill='tozeroy',
-                    fillcolor='rgba(55, 114, 255, 0.1)'
-                ))
-                fig.update_layout(
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    height=250,
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(showgrid=False, color='#434651'),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', side='right'),
-                    title=D['chart_title'],
-                    title_font=dict(size=14, color='#848e9c')
-                )
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-            # TEKNİK ANALİZ (GİZLİ PANEL)
-            with st.expander(D['detail']):
-                st.caption("Uluslararası standartlarda TradingView veri motoru kullanılmaktadır.")
-                # Buraya sadece iframe gelecek, Rackspace vb. görünmez.
-                pass 
+            # O siteyi barındıran Teknik Analiz bloğu (with st.expander) tamamen kaldırıldı.
                 
             st.markdown("<hr style='opacity:0.1'>", unsafe_allow_html=True)
         except:
