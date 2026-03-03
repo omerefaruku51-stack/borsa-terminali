@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM VE MODAL AYARLARI
+# 1. TASARIM VE SAYFA AYARLARI
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -25,7 +25,7 @@ st.markdown("""
     .symbol-name { font-size: 2rem; font-weight: 800; color: #3772ff; margin-bottom: 5px; }
     .price-now { font-size: 3.2rem; font-weight: 700; margin: 10px 0; }
     
-    /* Senin paylaştığın Details Row Yapısı */
+    /* SENİN PAYLAŞTIĞIN YAPININ CSS KARŞILIĞI */
     .details-row { 
         display: flex; 
         justify-content: space-around; 
@@ -41,8 +41,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL VE YAN PANEL (SIDEBAR) SİSTEMİ
-dil_paketleri = {
+# 2. DİL VE YAN PANEL SİSTEMİ
+DIL_PAKETI = {
     "Türkçe": {
         "baslik": "BORSA PRO TERMİNAL",
         "ayar": "⚙️ Terminal Ayarları",
@@ -66,21 +66,21 @@ dil_paketleri = {
 }
 
 with st.sidebar:
-    # Dil seçimi en üstte, seçildiği an tüm panel dili değişir
-    secilen_dil = st.selectbox("Language / Dil", ["Türkçe", "English"])
-    D = dil_paketleri[secilen_dil]
+    # Dil seçimi: Seçildiği an tüm panel ve ana ekran değişir
+    dil_secim = st.selectbox("Language / Dil", ["Türkçe", "English"])
+    D = DIL_PAKETI[dil_secim]
     
     st.divider()
     st.markdown(f"### {D['ayar']}")
     
-    # Para Birimi ve Yenileme
+    # Para Birimi ve Yenileme Kontrolleri
     para_birimi = st.radio(D["para"], ["₺ TRY", "$ USD"])
     oto_taze = st.checkbox(D["yenile"], value=True)
     
     st.divider()
-    st.caption("BIST: .IS | Crypto: -USD")
+    st.caption("v1.0 Pro - Play Store Ready")
 
-# 3. VERİ MOTORU (DÖVİZ KURU)
+# 3. VERİ MOTORU (KUR HESAPLAMA)
 @st.cache_data(ttl=600)
 def get_usd():
     try: return float(yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1])
@@ -92,7 +92,7 @@ st.markdown(f"<h1 style='text-align: center; color: #ffffff;'>{D['baslik']}</h1>
 search_input = st.text_input("", placeholder=D["ara"])
 symbols = [s.strip().upper() for s in search_input.split(",") if s.strip()]
 
-# 5. GÖRÜNTÜLEME (SENİN HTML YAPINLA)
+# 5. GÖRÜNTÜLEME (TAMAMEN SENİN YAPINLA)
 if not symbols:
     st.markdown(f"<div style='text-align: center; padding: 50px; color: #434651;'>{D['ara']}</div>", unsafe_allow_html=True)
 else:
@@ -105,16 +105,17 @@ else:
             p_now, p_prev = data['Close'].iloc[-1], data['Close'].iloc[-2]
             change = ((p_now - p_prev) / p_prev) * 100
             
-            # Kur Hesaplama
+            # Kur Hesaplama Mantığı
             is_bist = sym.endswith(".IS")
             unit = "₺" if "TRY" in para_birimi else "$"
             
             d_now = p_now * usd_kuru if ("TRY" in para_birimi and not is_bist) else (p_now / usd_kuru if ("USD" in para_birimi and is_bist) else p_now)
             d_prev = p_prev * usd_kuru if ("TRY" in para_birimi and not is_bist) else (p_prev / usd_kuru if ("USD" in para_birimi and is_bist) else p_prev)
 
-            # HTML KARTI
+            # RENK MANTIĞI
             color = "#00e676" if change >= 0 else "#ff1744"
             
+            # EKRAN KARTI (SENİN HTML YAPIN)
             st.markdown(f"""
                 <div class="data-card">
                     <div class="symbol-name">{sym}</div>
@@ -137,7 +138,7 @@ else:
         except:
             st.error(f"{sym}: {D['hata']}")
 
-# 6. REFRESH SİSTEMİ
+# 6. REFRESH SİSTEMİ (10 SANİYE)
 if oto_taze:
     time.sleep(10)
     st.rerun()
