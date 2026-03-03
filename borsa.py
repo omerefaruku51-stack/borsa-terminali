@@ -2,142 +2,143 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import time
+import plotly.graph_objects as go
 
-# 1. TASARIM VE SIFIRLAMA MANTIĞI
+# 1. TASARIM VE KURAL SETİ (Sidebar Kilitli)
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
-
-try:
-    import plotly.graph_objects as go
-    HAS_PLOTLY = True
-except ImportError:
-    HAS_PLOTLY = False
-
-# HAYALET VERİLERİ SİLMEK İÇİN SESSION TEMİZLİĞİ (ZORUNLU)
-# Eğer liste istediğimiz gibi değilse, burada listeyi zorla güncelliyoruz.
-TARGET_START = ["USDTRY=X", "EURTRY=X", "BTC-USD"]
-if 'watchlist' not in st.session_state or any(x not in st.session_state.watchlist for x in TARGET_START):
-    st.session_state.watchlist = TARGET_START
 
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     .stock-row {
         background: #1e222d; border-bottom: 1px solid #2a2e39;
-        padding: 8px 15px; display: flex; justify-content: space-between; align-items: center;
-        border-radius: 4px; margin-bottom: 2px;
+        padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;
+        border-radius: 4px; margin-bottom: 5px; cursor: pointer;
     }
-    .sym-name { flex: 2; font-weight: 800; color: #3772ff; font-size: 1rem; }
-    .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1rem; }
-    .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 0.9rem; }
+    .sym-name { flex: 2; font-weight: 800; color: #3772ff; font-size: 1.1rem; }
+    .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1.1rem; }
+    .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 1rem; }
     
-    /* Sidebar Milimetrik Hizalama */
+    /* Sidebar Milimetrik Hizalama - Kilitli */
     .aligned-text { display: inline-block; padding-top: 5px; font-size: 0.9rem; vertical-align: middle; }
     [data-testid="stHorizontalBlock"] { align-items: center; }
     
-    /* Silme Butonu */
-    .stButton>button { background-color: transparent; border: none; color: #ff1744; font-weight: bold; }
-    .stButton>button:hover { color: white; background-color: #ff1744; }
+    /* Buton ve Girdi Alanları */
+    .stButton>button { background-color: #3772ff; color: white; border-radius: 5px; width: 100%; border:none; height: 3rem;}
+    .stButton>button:hover { background-color: #2a58c7; }
+    .stTextInput>div>div>input { background-color: #1e222d; color: white; border: 1px solid #2a2e39; height: 3rem;}
     
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ
+# 2. DİL VE SABİT VERİLER
 DIL = {
-    "Türkçe": {
-        "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
-        "ara": "Ekle (THYAO, AAPL, BTC-USD...)", "ekle": "EKLE",
-        "detay": "Grafik", "bos": "Takip listesi boş."
-    },
-    "English": {
-        "para": "Currency", "yenile": "Auto Refresh (15s)",
-        "ara": "Add Symbol...", "ekle": "ADD",
-        "detay": "Chart", "bos": "List empty."
-    }
+    "Türkçe": {"para": "Para Birimi", "yenile": "Otomatik Yenile (15s)", "ara": "Hisse/Kripto Ekle...", "ekle": "EKLE", "bos": "Liste boş."},
+    "English": {"para": "Currency", "yenile": "Auto Refresh (15s)", "ara": "Add Asset...", "ekle": "ADD", "bos": "List empty."}
 }
 
-# 3. YAN PANEL (SIDEBAR) - TASARIM KORUNDU
+# 3. SIDEBAR (TASARIM KORUNDU)
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_lang")
     D = DIL[lang]
     st.divider()
-    
     st.write(f"**{D['para']}**")
     curr = st.radio("C_Select", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="curr_sel")
     st.divider()
-    
     c1, c2 = st.columns([0.15, 0.85])
     with c1:
         refresh = st.checkbox("R_Tog", value=True, label_visibility="collapsed", key="ref_tog")
     with c2:
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. EKLEME PANELİ
-col_input, col_btn = st.columns([0.85, 0.15])
-with col_input:
+# 4. TAKİP LİSTESİ YÖNETİMİ (Zorunlu Başlangıç)
+TARGET_START = ["USDTRY=X", "EURTRY=X", "BTC-USD"]
+if 'watchlist' not in st.session_state:
+    st.session_state.watchlist = TARGET_START.copy()
+
+# 5. ÜST PANEL (EKLEME)
+col_in, col_bt = st.columns([0.8, 0.2])
+with col_in:
     new_asset = st.text_input("", placeholder=D['ara'], key="add_input").upper()
-with col_btn:
-    st.write("##")
-    if st.button(D['ekle'], use_container_width=True):
+with col_bt:
+    if st.button(D['ekle']):
         if new_asset and new_asset not in st.session_state.watchlist:
             final_sym = new_asset if any(x in new_asset for x in ["=", "-"]) or "." in new_asset else f"{new_asset}.IS"
             st.session_state.watchlist.append(final_sym)
             st.rerun()
 
-# 5. VERİ VE İSİMLENDİRME
+# 6. VERİ MOTORU VE GÖMÜLÜ GRAFİK
 @st.cache_data(ttl=60)
-def get_usd_rate():
+def get_data(sym):
+    try:
+        data = yf.Ticker(sym).history(period="1mo", interval="1d")
+        return data if not data.empty else None
+    except: return None
+
+@st.cache_data(ttl=60)
+def get_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
     except: return 34.50
-usd_val = get_usd_rate()
+usd_rate = get_rate()
 
-def render_item(sym):
-    try:
-        t = yf.Ticker(sym)
-        df = t.history(period="1mo")
-        if df.empty: return
+def draw_row(sym):
+    df = get_data(sym)
+    if df is None: return
 
-        now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
-        pct = ((now - prev) / prev) * 100
-        
-        p_birimi = "TRY" if "TRY" in curr else "USD"
-        if sym == "USDTRY=X": display_name = "USD / TRY"
-        elif sym == "EURTRY=X": display_name = "EUR / TRY"
-        elif sym == "BTC-USD": display_name = f"BTC / {p_birimi}"
-        else: display_name = sym.replace('.IS','')
+    now = df['Close'].iloc[-1]
+    prev = df['Close'].iloc[-2]
+    pct = ((now - prev) / prev) * 100
+    color = "#00e676" if pct >= 0 else "#ff1744"
+    
+    # İsimlendirme
+    p_label = "TRY" if "TRY" in curr else "USD"
+    if sym == "USDTRY=X": name = "USD / TRY"
+    elif sym == "EURTRY=X": name = "EUR / TRY"
+    elif sym == "BTC-USD": name = f"BTC / {p_label}"
+    else: name = sym.replace('.IS','')
 
-        u_char = "₺" if "TRY" in curr else "$"
-        if "TRY" in curr:
-            d_now = now if any(x in sym for x in ["TRY", ".IS"]) else now * usd_val
-        else:
-            d_now = now if "-USD" in sym or (".IS" not in sym and "TRY" not in sym) else now / usd_val
-            
-        color = "#00e676" if pct >= 0 else "#ff1744"
+    # Kur Çevrimi
+    u_char = "₺" if "TRY" in curr else "$"
+    if "TRY" in curr:
+        val = now if any(x in sym for x in ["TRY", ".IS"]) else now * usd_rate
+    else:
+        val = now if "-USD" in sym or (".IS" not in sym and "TRY" not in sym) else now / usd_rate
 
-        row_col, del_col = st.columns([0.92, 0.08])
-        with row_col:
-            st.markdown(f"""
+    # ARAYÜZ
+    with st.container():
+        st.markdown(f"""
             <div class="stock-row">
-                <div class="sym-name">{display_name}</div>
-                <div class="price-val">{d_now:,.2f} {u_char}</div>
+                <div class="sym-name">{name}</div>
+                <div class="price-val">{val:,.2f} {u_char}</div>
                 <div class="pct-val" style="color:{color}">{pct:+.2f}%</div>
             </div>
-            """, unsafe_allow_html=True)
-            with st.expander(D['detay']):
-                if HAS_PLOTLY:
-                    fig = go.Figure(go.Scatter(x=df.index, y=df['Close'], line=dict(color='#3772ff', width=2), fill='tozeroy'))
-                    fig.update_layout(height=120, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(visible=False))
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        with del_col:
-            st.write("##")
-            if st.button("X", key=f"btn_{sym}"):
+        """, unsafe_allow_html=True)
+        
+        # Gömülü Grafik (Aşağı açılır Expander içinde)
+        with st.expander("Grafik / Chart"):
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df.index, y=df['Close'],
+                line=dict(color='#3772ff', width=3),
+                fill='tozeroy', fillcolor='rgba(55, 114, 255, 0.1)'
+            ))
+            fig.update_layout(
+                height=250, margin=dict(l=0,r=0,t=10,b=0),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(showgrid=False, color="#848e9c"),
+                yaxis=dict(side="right", showgrid=True, gridcolor="#2a2e39", color="#848e9c")
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            
+            # Silme butonu grafik altında
+            if st.button(f"Sil / Remove {name}", key=f"del_{sym}"):
                 st.session_state.watchlist.remove(sym)
                 st.rerun()
-    except: pass
 
-# 6. ANA LİSTE ÇİZİMİ
-for item in st.session_state.watchlist:
-    render_item(item)
+# 7. ÇALIŞTIRMA
+for asset in st.session_state.watchlist:
+    draw_row(asset)
 
 if refresh:
     time.sleep(15)
