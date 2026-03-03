@@ -27,6 +27,8 @@ st.markdown("""
         background: #2a2e39; padding: 4px 15px; font-size: 0.8rem;
         font-weight: bold; color: #848e9c; margin-top: 10px;
     }
+    /* Sidebar yazılarını biraz daha kibarlaştıralım */
+    .sidebar-text { font-size: 0.9rem; font-weight: 500; margin-bottom: -30px; }
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -45,21 +47,25 @@ DIL_VERISI = {
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - KESİN ÇÖZÜM
-# Sidebar'daki widget'ları bir "placeholder" içine alarak çiftlemeyi engelliyoruz
+# 3. YAN PANEL (SIDEBAR) - HİZALAMA DÜZELTİLDİ
 with st.sidebar:
-    # Dil seçimi en üstte ve sabit
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_language")
     D = DIL_VERISI[lang]
     st.divider()
     
-    # KİLİT NOKTA: Label'ları dile göre DEĞİŞTİRMİYORUZ (Çiftleme sebebi budur)
-    # Bunun yerine etiketleri boş bırakıp altına markdown ile açıklama yazıyoruz
+    # PARA BİRİMİ SEÇİMİ
     st.write(f"**{D['para']}**")
-    curr = st.radio("Currency Selection", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="currency_selector")
+    curr = st.radio("C_Select", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="currency_selector")
     
-    st.write(f"**{D['yenile']}**")
-    refresh = st.checkbox("Refresh Toggle", value=True, label_visibility="collapsed", key="refresh_toggle")
+    st.divider()
+
+    # OTOMATİK YENİLEME - YAN YANA DÜZEN
+    # Sütunlar kullanarak kutucuğu ve yazıyı aynı hizaya alıyoruz
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.write(D['yenile'])
+    with col2:
+        refresh = st.checkbox("R_Toggle", value=True, label_visibility="collapsed", key="refresh_toggle")
 
 # 4. HİSSE LİSTELERİ
 BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
@@ -93,7 +99,7 @@ def render_list(stock_list, is_tr):
             st.markdown(f"""
             <div class="stock-row">
                 <div class="sym-name">{sym.replace('.IS','')}</div>
-                <div class="price-now">{d_now:,.2f} {u_char}</div>
+                <div class="price-val">{d_now:,.2f} {u_char}</div>
                 <div class="pct-val" style="color:{color}">{pct:+.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
