@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM VE STRATEJİ (Sidebar Tasarımı Kilitli)
+# 1. TASARIM VE HAYALET TEMİZLİĞİ (Sidebar Kilitli)
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
 
 try:
@@ -24,7 +24,7 @@ st.markdown("""
     .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1rem; }
     .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 0.9rem; }
     
-    /* Sidebar Milimetrik Hizalama */
+    /* Sidebar Milimetrik Hizalama - Kilitli */
     .aligned-text { display: inline-block; padding-top: 5px; font-size: 0.9rem; vertical-align: middle; }
     [data-testid="stHorizontalBlock"] { align-items: center; }
     
@@ -40,19 +40,17 @@ st.markdown("""
 DIL = {
     "Türkçe": {
         "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
-        "ara": "Ekle (Hisse, Döviz, Altın...)", "ekle": "EKLE",
-        "detay": "Grafik", "bos": "Liste boş.",
-        "altin": "Altın"
+        "ara": "Ekle (THYAO, AAPL, BTC-USD...)", "ekle": "EKLE",
+        "detay": "Grafik", "bos": "Liste boş.", "altin": "Gram Altın"
     },
     "English": {
         "para": "Currency", "yenile": "Auto Refresh (15s)",
-        "ara": "Add (Stock, Forex, Gold...)", "ekle": "ADD",
-        "detay": "Chart", "bos": "List empty.",
-        "altin": "Gold"
+        "ara": "Add (Symbol Name...)", "ekle": "ADD",
+        "detay": "Chart", "bos": "List empty.", "altin": "Gold Gram"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - TASARIM KİLİTLİ
+# 3. YAN PANEL (SIDEBAR) - TASARIM KORUNDU
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_lang")
     D = DIL[lang]
@@ -69,9 +67,10 @@ with st.sidebar:
     with c2:
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. TAKİP LİSTESİ
+# 4. TAKİP LİSTESİ (Hayalet Yazıları Silmek İçin Liste Temizlendi)
+# SADECE senin istediğin ana birimler.
 if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-USD", "GC=F"]
+    st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-USD", "GRAM_ALTIN"]
 
 # 5. EKLEME PANELİ
 col_input, col_btn = st.columns([0.85, 0.15])
@@ -81,77 +80,89 @@ with col_btn:
     st.write("##")
     if st.button(D['ekle'], use_container_width=True):
         if new_asset and new_asset not in st.session_state.watchlist:
+            # BIST kontrolü
             final_sym = new_asset if any(x in new_asset for x in ["=", "-"]) or "." in new_asset else f"{new_asset}.IS"
             st.session_state.watchlist.append(final_sym)
             st.rerun()
 
-# 6. VERİ VE İSİMLENDİRME MOTORU
+# 6. VERİ MOTORU (Gram Altın Hesaplamalı)
 @st.cache_data(ttl=60)
-def get_usd():
+def get_market_data(sym):
+    try:
+        if sym == "GRAM_ALTIN":
+            # Gram Altın = (Ons Altın / 31.1035) * Dolar/TL
+            ons = yf.Ticker("GC=F").history(period="1mo")
+            kur = yf.Ticker("USDTRY=X").history(period="1mo")
+            df = (ons['Close'] / 31.1035) * kur['Close']
+            return pd.DataFrame({'Close': df})
+        else:
+            return yf.Ticker(sym).history(period="1mo")
+    except: return pd.DataFrame()
+
+@st.cache_data(ttl=60)
+def get_usd_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
     except: return 34.50
-usd_val = get_usd()
 
-def get_display_name(sym, current_curr, d_pack):
-    # Dinamik isimlendirme: Artık "USD" kullanıyoruz
-    p_birimi = "TRY" if "TRY" in current_curr else "USD"
-    
-    if sym == "USDTRY=X": return "USD / TRY"
-    if sym == "EURTRY=X": return "EUR / TRY"
-    if sym == "EURUSD=X": return "EUR / USD"
-    if sym == "BTC-USD": return f"BTC / {p_birimi}"
-    if sym == "GC=F": return f"{d_pack['altin']} / {p_birimi}"
-    
-    return sym.replace('.IS','')
+usd_val = get_usd_rate()
 
 def render_item(sym):
-    try:
-        t = yf.Ticker(sym)
-        df = t.history(period="1mo")
-        if df.empty: return
+    df = get_market_data(sym)
+    if df.empty: return
 
-        now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
-        pct = ((now - prev) / prev) * 100
-        
-        display_name = get_display_name(sym, curr, D)
-        u_char = "₺" if "TRY" in curr else "$"
-        
-        if "TRY" in curr and ".IS" not in sym and "TRY" not in sym:
-            d_now = now * usd_val
-        elif "USD" in curr and (".IS" in sym or "TRY" in sym):
-            d_now = now / usd_val
-        else:
+    now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
+    pct = ((now - prev) / prev) * 100
+    
+    # İsimlendirme ve Döviz Çevrimi
+    p_birimi = "TRY" if "TRY" in curr else "USD"
+    u_char = "₺" if "TRY" in curr else "$"
+    
+    if sym == "USDTRY=X": display_name = "USD / TRY"
+    elif sym == "EURTRY=X": display_name = "EUR / TRY"
+    elif sym == "BTC-USD": display_name = f"BTC / {p_birimi}"
+    elif sym == "GRAM_ALTIN": display_name = f"{D['altin']} / {p_birimi}"
+    else: display_name = sym.replace('.IS','')
+
+    # Kur Çevrim Mantığı
+    if "TRY" in curr:
+        # Zaten TL olanlar: USDTRY, EURTRY, GRAM_ALTIN (bizim hesapladığımız), BIST(.IS)
+        if any(x in sym for x in ["TRY", ".IS"]) or sym == "GRAM_ALTIN":
             d_now = now
+        else: # USD bazlı olanlar (BTC-USD, AAPL vb.)
+            d_now = now * usd_val
+    else: # USD seçiliyse
+        # Zaten USD olanlar: BTC-USD, AAPL vb.
+        if "-USD" in sym or (".IS" not in sym and "TRY" not in sym and sym != "GRAM_ALTIN"):
+            d_now = now
+        else: # TL bazlı olanlar (USDTRY, EURTRY, BIST, GRAM_ALTIN) USD'ye çevrilir
+            d_now = now / usd_val
             
-        color = "#00e676" if pct >= 0 else "#ff1744"
+    color = "#00e676" if pct >= 0 else "#ff1744"
 
-        row_col, del_col = st.columns([0.92, 0.08])
-        with row_col:
-            st.markdown(f"""
-            <div class="stock-row">
-                <div class="sym-name">{display_name}</div>
-                <div class="price-val">{d_now:,.2f} {u_char}</div>
-                <div class="pct-val" style="color:{color}">{pct:+.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-            with st.expander(D['detay']):
-                if HAS_PLOTLY:
-                    fig = go.Figure(go.Scatter(x=df.index, y=df['Close'], line=dict(color='#3772ff', width=2), fill='tozeroy'))
-                    fig.update_layout(height=120, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(visible=False))
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        with del_col:
-            st.write("##")
-            if st.button("X", key=f"btn_{sym}"):
-                st.session_state.watchlist.remove(sym)
-                st.rerun()
-    except: pass
+    row_col, del_col = st.columns([0.92, 0.08])
+    with row_col:
+        st.markdown(f"""
+        <div class="stock-row">
+            <div class="sym-name">{display_name}</div>
+            <div class="price-val">{d_now:,.2f} {u_char}</div>
+            <div class="pct-val" style="color:{color}">{pct:+.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.expander(D['detay']):
+            if HAS_PLOTLY:
+                fig = go.Figure(go.Scatter(x=df.index, y=df['Close'], line=dict(color='#3772ff', width=2), fill='tozeroy'))
+                fig.update_layout(height=120, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(visible=False))
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    with del_col:
+        st.write("##")
+        if st.button("X", key=f"btn_{sym}"):
+            st.session_state.watchlist.remove(sym)
+            st.rerun()
 
-# 7. ANA LİSTE
-if st.session_state.watchlist:
+# 7. ANA LİSTE (Hayaletleri engellemek için sadece bu listeden çizilir)
+if 'watchlist' in st.session_state:
     for item in st.session_state.watchlist:
         render_item(item)
-else:
-    st.info(D['bos'])
 
 if refresh:
     time.sleep(15)
