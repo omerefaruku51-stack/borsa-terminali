@@ -3,21 +3,19 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# Plotly kontrolü (Hata devam ederse uygulama çökmesin diye)
+# Plotly kontrolü
 try:
     import plotly.graph_objects as go
     HAS_PLOTLY = True
 except ImportError:
     HAS_PLOTLY = False
 
-# 1. KOMPAKT TASARIM (CSS)
+# 1. TASARIM AYARLARI
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
-    
-    /* İnce Satır Tasarımı */
     .stock-row {
         background: #1e222d;
         border-bottom: 1px solid #2a2e39;
@@ -38,37 +36,59 @@ st.markdown("""
         color: #848e9c;
         margin-top: 10px;
     }
-
-    /* Arama Çubuğu */
-    .stTextInput input {
-        background-color: #1e222d !important;
-        border: 1px solid #3772ff !important;
-        color: white !important;
-    }
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. HİSSE LİSTELERİ
-BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS", "PGSUS.IS"])
+# 2. DİL PAKETLERİ (Sidebar dahil her şey burada)
+DIL_AYARLARI = {
+    "Türkçe": {
+        "sidebar_baslik": "📊 Ayarlar",
+        "dil_sec": "Dil Seçiniz",
+        "para_birimi": "Para Birimi",
+        "oto_yenile": "Otomatik Yenile (15s)",
+        "ara_placeholder": "Hisse Ara...",
+        "detay_btn": "Grafiği Göster",
+        "tr_bolum": "BIST HİSSELERİ",
+        "us_bolum": "ABD HİSSELERİ",
+        "arama_sonuc": "ARAMA SONUÇLARI",
+        "yukleniyor": "Grafik kütüphanesi yükleniyor..."
+    },
+    "English": {
+        "sidebar_baslik": "📊 Settings",
+        "dil_sec": "Select Language",
+        "para_birimi": "Currency",
+        "oto_yenile": "Auto Refresh (15s)",
+        "ara_placeholder": "Search Stock...",
+        "detay_btn": "Show Chart",
+        "tr_bolum": "TURKISH STOCKS",
+        "us_bolum": "US STOCKS",
+        "arama_sonuc": "SEARCH RESULTS",
+        "yukleniyor": "Chart library loading..."
+    }
+}
+
+# 3. YAN PANEL (SIDEBAR) - DİNAMİK YAPI
+with st.sidebar:
+    # Önce sadece dil seçimi (bu sabit kalabilir veya "Language" yazılabilir)
+    lang_key = st.selectbox("Language / Dil", ["Türkçe", "English"])
+    D = DIL_AYARLARI[lang_key] # Seçilen dile göre paketi yükle
+    
+    st.title(D["sidebar_baslik"]) # Dile göre değişen başlık
+    st.divider()
+    
+    # Dile göre değişen ayarlar
+    curr = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"])
+    refresh = st.checkbox(D["oto_yenile"], value=True)
+
+# 4. HİSSE LİSTELERİ
+BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
 US_LIST = sorted(["AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN"])
 
-# 3. YAN PANEL
-with st.sidebar:
-    st.title("📊 Ayarlar")
-    lang = st.selectbox("Dil", ["Türkçe", "English"])
-    curr = st.radio("Para Birimi", ["₺ TRY", "$ USD"])
-    refresh = st.checkbox("Otomatik Yenile (15s)", value=True)
+# 5. ARAMA MOTORU
+search_input = st.text_input("", placeholder=D['ara_placeholder']).upper()
 
-D = {
-    "Türkçe": {"ara": "Hisse Ara...", "detay": "Grafiği Göster", "tr": "BIST HİSSELERİ", "us": "ABD HİSSELERİ"},
-    "English": {"ara": "Search...", "detay": "Show Chart", "tr": "TURKISH STOCKS", "us": "US STOCKS"}
-}[lang]
-
-# 4. ARAMA MOTORU
-search_input = st.text_input("", placeholder=D['ara']).upper()
-
-# 5. KUR VERİSİ
+# 6. VERİ VE KUR MOTORU
 @st.cache_data(ttl=3600)
 def get_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
@@ -76,9 +96,7 @@ def get_rate():
 usd_rate = get_rate()
 
 def render_list(stock_list, is_tr):
-    # Arama Filtresi
     filtered = [s for s in stock_list if search_input in s.replace('.IS','')]
-    
     for sym in filtered:
         try:
             t = yf.Ticker(sym)
@@ -89,10 +107,11 @@ def render_list(stock_list, is_tr):
             pct = ((now - prev) / prev) * 100
             
             u_char = "₺" if "TRY" in curr else "$"
+            # Kur hesaplama mantığı
             d_now = now * usd_rate if ("TRY" in curr and not is_tr) else (now / usd_rate if ("USD" in curr and is_tr) else now)
             color = "#00e676" if pct >= 0 else "#ff1744"
 
-            # KOMPAKT SATIR GÖRÜNÜMÜ
+            # Satır Görünümü
             st.markdown(f"""
             <div class="stock-row">
                 <div class="sym-name">{sym.replace('.IS','')}</div>
@@ -101,25 +120,24 @@ def render_list(stock_list, is_tr):
             </div>
             """, unsafe_allow_html=True)
             
-            # GRAFİK EXPANDER
-            with st.expander(D['detay']):
+            with st.expander(D['detay_btn']):
                 if HAS_PLOTLY:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], line=dict(color='#3772ff', width=2), fill='tozeroy', fillcolor='rgba(55, 114, 255, 0.05)'))
                     fig.update_layout(height=140, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(visible=False))
                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 else:
-                    st.info("Kütüphane yükleniyor...")
+                    st.info(D["yukleniyor"])
         except: continue
 
-# 6. ANA AKIŞ
+# 7. ANA AKIŞ
 if search_input:
-    st.markdown(f"<div class='market-header'>ARAMA SONUÇLARI</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['arama_sonuc']}</div>", unsafe_allow_html=True)
     render_list(BIST_LIST + US_LIST, True)
 else:
-    st.markdown(f"<div class='market-header'>{D['tr']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['tr_bolum']}</div>", unsafe_allow_html=True)
     render_list(BIST_LIST, True)
-    st.markdown(f"<div class='market-header'>{D['us']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['us_bolum']}</div>", unsafe_allow_html=True)
     render_list(US_LIST, False)
 
 if refresh:
