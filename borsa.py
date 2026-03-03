@@ -12,19 +12,32 @@ st.markdown("""
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     [data-testid="stSidebar"] { background-color: #161a25; }
     
+    /* Veri Kutusu Tasarımı */
     .data-box {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        padding: 15px;
+        padding: 20px;
         text-align: center;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
     }
-    .price-label { font-size: 0.8rem; color: #848e9c; }
-    .price-value { font-size: 1.1rem; font-weight: 600; }
+    .price-item { flex: 1; }
+    .price-label { font-size: 0.85rem; color: #848e9c; margin-bottom: 5px; }
+    .price-value { font-size: 1.3rem; font-weight: 700; }
     
-    .symbol-title { font-size: 1.8rem; font-weight: 700; color: #3772ff; margin-bottom: 5px; }
+    .symbol-title { font-size: 2rem; font-weight: 800; color: #3772ff; margin-bottom: 10px; }
     header, footer {visibility: hidden;}
-    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 1.5rem 0; }
+    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 2rem 0; }
+    
+    /* Expander Buton Şıklığı */
+    .streamlit-expanderHeader {
+        background-color: #1e222d !important;
+        border: 1px solid #3772ff !important;
+        border-radius: 10px !important;
+        color: #3772ff !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -33,17 +46,17 @@ dil_ayarlari = {
     "Türkçe": {
         "ana_baslik": "BORSA INTELLIGENCE PRO",
         "ayar": "Ayarlar", "para": "Para Birimi",
-        "yenile": "15sn Otomatik Güncelle", "son_24": "Son 24 Saat",
-        "kapanis": "Dünkü Kapanış", "guncel": "Güncel Fiyat",
-        "detay": "📈 Detaylı Teknik Analiz Grafiği",
+        "yenile": "15sn Otomatik Güncelle", "son_24": "Son 24 Saat Özeti",
+        "kapanis": "Önceki Kapanış", "guncel": "Anlık Fiyat",
+        "detay": "🔍 Detaylı Teknik Analiz Grafiği ve İndikatörler",
         "ara": "Hisse Ara (THYAO.IS, BTC-USD, AAPL...)", "hata": "Veri bulunamadı"
     },
     "English": {
         "ana_baslik": "STOCK INTELLIGENCE PRO",
         "ayar": "Settings", "para": "Currency",
-        "yenile": "Auto-Refresh 15s", "son_24": "Last 24 Hours",
+        "yenile": "Auto-Refresh 15s", "son_24": "Last 24h Summary",
         "kapanis": "Prev. Close", "guncel": "Current Price",
-        "detay": "📈 Show Detailed Technical Chart",
+        "detay": "🔍 Detailed Technical Chart & Indicators",
         "ara": "Search (AAPL, NVDA, BTC-USD...)", "hata": "Data not found"
     }
 }
@@ -63,18 +76,18 @@ def get_usd():
     except: return 34.45
 usd_rate = get_usd()
 
-st.markdown(f"<h1 style='text-align: center;'>{D['ana_baslik']}</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center; letter-spacing: 2px;'>{D['ana_baslik']}</h1>", unsafe_allow_html=True)
 search = st.text_input("", placeholder=D["ara"])
 symbols = [s.strip().upper() for s in search.split(",") if s.strip()]
 
-# 5. GÖRÜNTÜLEME
+# 5. GÖRÜNTÜLEME (GRAFİKSİZ SADE TASARIM)
 if not symbols:
-    st.markdown("<div style='text-align: center; padding: 50px; color: #434651;'>İzlemek istediğiniz sembolleri girin.</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; padding: 50px; color: #434651;'>İzlemek istediğiniz sembolleri girerek analiz etmeye başlayın.</div>", unsafe_allow_html=True)
 else:
     for sym in symbols:
         try:
             t = yf.Ticker(sym)
-            df = t.history(period="5d")
+            df = t.history(period="2d")
             if df.empty: continue
             
             p_now, p_prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
@@ -86,53 +99,53 @@ else:
             d_now = p_now * usd_rate if ("TRY" in curr and not is_bist) else (p_now / usd_rate if ("USD" in curr and is_bist) else p_now)
             d_prev = p_prev * usd_rate if ("TRY" in curr and not is_bist) else (p_prev / usd_rate if ("USD" in curr and is_bist) else p_prev)
 
+            # BAŞLIK
             st.markdown(f"<div class='symbol-title'>{sym}</div>", unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([1.2, 2, 2])
             
-            with c1:
-                st.metric(D["guncel"], f"{d_now:,.2f} {unit}", f"{change:+.2f}%")
+            # ANA VERİ SATIRI
+            col_main, col_spacer = st.columns([3, 1])
             
-            with c2:
-                st.markdown(f"**{D['son_24']}**")
+            with col_main:
                 st.markdown(f"""
                 <div class="data-box">
-                    <div class="price-label">{D['kapanis']}</div>
-                    <div class="price-value">{d_prev:,.2f} {unit}</div>
-                    <div style="margin: 8px 0; border-top: 1px solid rgba(255,255,255,0.1);"></div>
-                    <div class="price-label">{D['guncel']}</div>
-                    <div class="price-value" style="color:{'#00e676' if change>=0 else '#ff1744'}">{d_now:,.2f} {unit}</div>
+                    <div class="price-item">
+                        <div class="price-label">{D['kapanis']}</div>
+                        <div class="price-value">{d_prev:,.2f} {unit}</div>
+                    </div>
+                    <div style="height: 40px; border-left: 1px solid rgba(255,255,255,0.1);"></div>
+                    <div class="price-item">
+                        <div class="price-label">{D['guncel']}</div>
+                        <div class="price-value" style="color:{'#00e676' if change>=0 else '#ff1744'}">
+                            {d_now:,.2f} {unit} 
+                            <span style="font-size: 0.9rem; margin-left: 10px;">({change:+.2f}%)</span>
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            with c3:
-                st.line_chart(df['Close'], height=180)
 
             # --- TRADINGVIEW ENTEGRASYONU ---
             with st.expander(D["detay"]):
-                # Sembol Formatlama
                 tv_sym = sym.replace(".IS", "")
                 if is_bist: tv_sym = f"BIST:{tv_sym}"
                 elif "-" in sym: tv_sym = f"BINANCE:{tv_sym.replace('-', '')}"
                 else: tv_sym = f"NASDAQ:{tv_sym}"
                 
-                # TradingView HTML Widget
                 tv_html = f"""
-                <div style="height:500px;">
-                <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                <script type="text/javascript">
-                new TradingView.widget({{
-                  "width": "100%", "height": 500, "symbol": "{tv_sym}",
-                  "interval": "H", "timezone": "Europe/Istanbul",
-                  "theme": "dark", "style": "1", "locale": "tr",
-                  "toolbar_bg": "#f1f3f6", "enable_publishing": false,
-                  "hide_top_toolbar": false, "allow_symbol_change": true,
-                  "container_id": "tv_chart"
-                }});
-                </script>
-                <div id="tv_chart"></div>
+                <div id="tv_chart_container" style="height:550px;">
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({{
+                      "autosize": true, "symbol": "{tv_sym}",
+                      "interval": "60", "timezone": "Europe/Istanbul",
+                      "theme": "dark", "style": "1", "locale": "tr",
+                      "toolbar_bg": "#f1f3f6", "enable_publishing": false,
+                      "hide_side_toolbar": false, "allow_symbol_change": true,
+                      "container_id": "tv_chart_container"
+                    }});
+                    </script>
                 </div>
                 """
-                components.html(tv_html, height=520)
+                components.html(tv_html, height=560)
             
             st.markdown("<hr>", unsafe_allow_html=True)
         except:
