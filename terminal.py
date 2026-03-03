@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM (Sidebar Kilitli & Hayalet Veri Temizliği)
+# 1. TASARIM VE STRATEJİ (Sidebar Tasarımı Kilitli)
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
 
 try:
@@ -12,7 +12,6 @@ try:
 except ImportError:
     HAS_PLOTLY = False
 
-# Sayfa başında hayalet verileri temizlemek için cache'i zorluyoruz
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
@@ -29,7 +28,7 @@ st.markdown("""
     .aligned-text { display: inline-block; padding-top: 5px; font-size: 0.9rem; vertical-align: middle; }
     [data-testid="stHorizontalBlock"] { align-items: center; }
     
-    /* Silme Butonu Stili */
+    /* Silme Butonu */
     .stButton>button { background-color: transparent; border: none; color: #ff1744; font-weight: bold; }
     .stButton>button:hover { color: white; background-color: #ff1744; }
     
@@ -37,21 +36,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ
+# 2. DİL PAKETLERİ (Dinamik İsimlendirme İçin)
 DIL = {
     "Türkçe": {
         "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
-        "ara": "Hisse/Döviz/Altın Ekle (Örn: THYAO, AAPL, BTC-USD)",
-        "ekle": "EKLE", "detay": "Grafik", "bos": "Takip listesi boş."
+        "ara": "Ekle (Hisse, Döviz, Altın...)", "ekle": "EKLE",
+        "detay": "Grafik", "bos": "Liste boş.",
+        "altin": "Altın", "dolar": "Dolar", "euro": "Euro"
     },
     "English": {
         "para": "Currency", "yenile": "Auto Refresh (15s)",
-        "ara": "Add Asset (e.g. NVDA, EURTRY=X, GC=F)",
-        "ekle": "ADD", "detay": "Chart", "bos": "Watchlist is empty."
+        "ara": "Add (Stock, Forex, Gold...)", "ekle": "ADD",
+        "detay": "Chart", "bos": "List empty.",
+        "altin": "Gold", "dolar": "Dollar", "euro": "Euro"
     }
 }
 
-# 3. SIDEBAR (TASARIM SABİT TUTULDU)
+# 3. YAN PANEL (SIDEBAR) - TASARIM KESİNLİKLE BOZULMADI
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_lang")
     D = DIL[lang]
@@ -68,12 +69,11 @@ with st.sidebar:
     with c2:
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. TAKİP LİSTESİ (SADECE SENİN İSTEDİĞİN 4'LÜ)
-# Hayaletleri temizlemek için session_state'i daha güvenli kontrol ediyoruz
+# 4. TAKİP LİSTESİ (Sadece senin istediğin 4 ana birimle başlar)
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-USD", "GC=F"]
 
-# 5. EKLEME PANELİ (Üst Kısım)
+# 5. EKLEME PANELİ
 col_input, col_btn = st.columns([0.85, 0.15])
 with col_input:
     new_asset = st.text_input("", placeholder=D['ara'], key="add_input").upper()
@@ -81,17 +81,29 @@ with col_btn:
     st.write("##")
     if st.button(D['ekle'], use_container_width=True):
         if new_asset and new_asset not in st.session_state.watchlist:
-            # BIST otomatik tamamlama
             final_sym = new_asset if any(x in new_asset for x in ["=", "-"]) or "." in new_asset else f"{new_asset}.IS"
             st.session_state.watchlist.append(final_sym)
             st.rerun()
 
-# 6. VERİ VE LİSTELEME MOTORU
-@st.cache_data(ttl=60) # Verileri daha sık tazeliyoruz ki hayalet kalmasın
+# 6. VERİ VE İSİMLENDİRME MOTORU
+@st.cache_data(ttl=60)
 def get_usd():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
     except: return 34.50
 usd_val = get_usd()
+
+def get_display_name(sym, current_curr, d_pack):
+    # Dinamik isimlendirme mantığı: Varlık / Para Birimi
+    p_birimi = "TRY" if "TRY" in current_curr else (d_pack["dolar"] if lang=="Türkçe" else "USD")
+    
+    if sym == "USDTRY=X": return f"USD / TRY"
+    if sym == "EURTRY=X": return f"EUR / TRY"
+    if sym == "EURUSD=X": return f"EUR / USD"
+    if sym == "BTC-USD": return f"BTC / {p_birimi}"
+    if sym == "GC=F": return f"{d_pack['altin']} / {p_birimi}"
+    
+    # Hisse senetleri için
+    return sym.replace('.IS','')
 
 def render_item(sym):
     try:
@@ -102,9 +114,8 @@ def render_item(sym):
         now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
         pct = ((now - prev) / prev) * 100
         
-        # İsim Düzenleme
-        display_name = sym.replace('.IS','').replace('=X','').replace('-USD','')
-        if sym == "GC=F": display_name = "Altın / Gold"
+        # İsimlendirme
+        display_name = get_display_name(sym, curr, D)
         
         # Kur Hesaplama
         u_char = "₺" if "TRY" in curr else "$"
@@ -117,7 +128,6 @@ def render_item(sym):
             
         color = "#00e676" if pct >= 0 else "#ff1744"
 
-        # Arayüz Çizimi
         row_col, del_col = st.columns([0.92, 0.08])
         with row_col:
             st.markdown(f"""
@@ -137,10 +147,9 @@ def render_item(sym):
             if st.button("X", key=f"btn_{sym}"):
                 st.session_state.watchlist.remove(sym)
                 st.rerun()
-    except:
-        pass
+    except: pass
 
-# 7. ANA LİSTEYİ ÇİZ
+# 7. ANA LİSTE
 if st.session_state.watchlist:
     for item in st.session_state.watchlist:
         render_item(item)
