@@ -2,8 +2,8 @@ import streamlit as st
 import yfinance as yf
 import time
 
-# 1. TASARIM (Sidebar Hizalaması Sabit)
-st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
+# 1. TASARIM AYARLARI (Sidebar Kilitli)
+st.set_page_config(page_title="Borsa Terminali", layout="wide")
 
 st.markdown("""
     <style>
@@ -17,7 +17,7 @@ st.markdown("""
     .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1.2rem; }
     .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 1.1rem; }
     
-    /* SIDEBAR MİLİMETRİK HİZALAMA */
+    /* SIDEBAR MİLİMETRİK HİZALAMA: KUTUCUK SOLDA, YAZI SAĞDA */
     .aligned-text { display: inline-block; padding-top: 5px; font-size: 0.9rem; vertical-align: middle; }
     [data-testid="stHorizontalBlock"] { align-items: center; }
     
@@ -25,16 +25,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. HAFIZA TEMİZLEME MOTORU (ZORUNLU)
-if st.sidebar.button("⚠️ SİSTEMİ SIFIRLA"):
-    st.session_state.clear()
-    st.rerun()
-
-# Ana Listeyi Zorla Tanımla
-if 'watchlist' not in st.session_state or len(st.session_state.watchlist) == 0:
-    st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-TRY"]
-
-# 3. YAN PANEL (SIDEBAR)
+# 2. YAN PANEL (SIDEBAR)
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"])
     st.divider()
@@ -42,75 +33,79 @@ with st.sidebar:
     curr = st.radio("C_Select", ["₺ TRY", "$ USD"], label_visibility="collapsed")
     st.divider()
     
-    # KUTUCUK SOLDA, YAZI SAĞDA (Senin özel tasarımın)
+    # SENİN ÖZEL HİZALAMAN (KUTUCUK SOLDA, YAZI SAĞDA)
     c1, c2 = st.columns([0.15, 0.85])
     with c1:
         refresh = st.checkbox("R_Tog", value=True, label_visibility="collapsed")
     with c2:
         st.markdown('<span class="aligned-text">Otomatik Yenile (15s)</span>', unsafe_allow_html=True)
 
-# 4. VERİ ÇEKME VE BASMA
-def draw_watchlist():
-    # Güncel kur (çevrim için)
+# 3. VERİ ÇEKME MOTORU
+def get_price(sym):
     try:
-        u_rate = yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
-    except:
-        u_rate = 34.50
+        # Cache kullanmıyoruz, her saniye canlı sorgu
+        d = yf.Ticker(sym).history(period="2d")
+        if d.empty: return None
+        return d
+    except: return None
 
-    for sym in st.session_state.watchlist:
-        try:
-            # Önbelleksiz canlı veri
-            ticker = yf.Ticker(sym)
-            df = ticker.history(period="2d")
-            
-            if df.empty:
-                # Veri boşsa alternatif yöntem dene (Bazen yfinance takılıyor)
-                st.warning(f"Veri çekilemedi: {sym}")
-                continue
-                
-            now = df['Close'].iloc[-1]
-            prev = df['Close'].iloc[-2]
-            pct = ((now - prev) / prev) * 100
-            
-            # İsimlendirme
-            if sym == "USDTRY=X": name = "USD / TRY"
-            elif sym == "EURTRY=X": name = "EUR / TRY"
-            elif sym == "BTC-TRY": name = "BTC / TRY"
-            else: name = sym.replace('.IS','')
-            
-            # Para Birimi ve Fiyat Ayarı
-            symbol_char = "₺" if "TRY" in curr else "$"
-            display_price = now
-            
-            if "USD" in curr and ("TRY" in sym or ".IS" in sym):
-                display_price = now / u_rate
-            elif "TRY" in curr and ("-USD" in sym or (".IS" not in sym and "TRY" not in sym)):
-                display_price = now * u_rate
+# 4. ANA EKRAN (HAFIZAYI BYPASS EDEN ÇİVİLİ LİSTE)
+st.write("### Canlı Varlık Takibi")
 
-            st.markdown(f"""
-                <div class="stock-row">
-                    <div class="sym-name">{name}</div>
-                    <div class="price-val">{display_price:,.2f} {symbol_char}</div>
-                    <div class="pct-val" style="color:{'#00e676' if pct >= 0 else '#ff1744'}">{pct:+.2f}%</div>
-                </div>
-            """, unsafe_allow_html=True)
-        except:
-            st.error(f"Hata oluştu: {sym}")
+# Bu liste asla session_state kullanmaz, doğrudan koda gömülüdür.
+ANA_LISTE = [
+    {"sym": "USDTRY=X", "name": "USD / TRY"},
+    {"sym": "EURTRY=X", "name": "EUR / TRY"},
+    {"sym": "BTC-TRY",  "name": "BTC / TRY"}
+]
 
-# 5. ÜST PANEL VE EKLEME
+# Güncel dolar kurunu bir kere çek (USD çevrimi için)
+try:
+    current_usd_rate = yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
+except:
+    current_usd_rate = 34.50
+
+# Ekrana Basma Döngüsü
+for item in ANA_LISTE:
+    df = get_price(item['sym'])
+    if df is not None:
+        now = df['Close'].iloc[-1]
+        prev = df['Close'].iloc[-2]
+        pct = ((now - prev) / prev) * 100
+        
+        # Para Birimi Sembolü ve Fiyat Hesaplama
+        symbol_char = "₺" if "TRY" in curr else "$"
+        # Eğer Sidebar'dan USD seçiliyse ve veri TRY bazlıysa (bizim 3 birim de öyle), kurla bölüyoruz.
+        final_price = now / current_usd_rate if "USD" in curr else now
+
+        st.markdown(f"""
+            <div class="stock-row">
+                <div class="sym-name">{item['name']}</div>
+                <div class="price-val">{final_price:,.2f} {symbol_char}</div>
+                <div class="pct-val" style="color:{'#00e676' if pct >= 0 else '#ff1744'}">{pct:+.2f}%</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+# 5. MANUEL EKLEME KISMI (Yalnızca burası hafızada tutulur)
+st.divider()
+if 'user_extra' not in st.session_state:
+    st.session_state.user_extra = []
+
 col_in, col_bt = st.columns([0.8, 0.2])
 with col_in:
-    new_asset = st.text_input("", placeholder="Hisse Ekle (THYAO vb.)").upper()
+    extra = st.text_input("", placeholder="Ekstra Hisse Ekle (Örn: THYAO)").upper()
 with col_bt:
     st.write("##")
     if st.button("EKLE"):
-        if new_asset and new_asset not in st.session_state.watchlist:
-            final = new_asset if any(x in new_asset for x in ["=", "-"]) or "." in new_asset else f"{new_asset}.IS"
-            st.session_state.watchlist.append(final)
+        if extra and extra not in st.session_state.user_extra:
+            final_ex = extra if any(x in extra for x in ["=", "-"]) or "." in extra else f"{extra}.IS"
+            st.session_state.user_extra.append(final_ex)
             st.rerun()
 
-# Listeyi Çiz
-draw_watchlist()
+for ex_item in st.session_state.user_extra:
+    ex_df = get_price(ex_item)
+    if ex_df is not None:
+        st.markdown(f'<div class="stock-row"><div class="sym-name">{ex_item}</div><div class="price-val">{ex_df["Close"].iloc[-1]:,.2f}</div></div>', unsafe_allow_html=True)
 
 # 6. YENİLEME
 if refresh:
