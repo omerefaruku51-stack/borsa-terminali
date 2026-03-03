@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM AYARLARI (Göz yormayan, modern ve sade)
+# 1. PREMIUM UI AYARLARI
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -11,95 +11,91 @@ st.markdown("""
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     [data-testid="stSidebar"] { background-color: #161a25; border-right: 1px solid rgba(255,255,255,0.1); }
     
-    /* Veri Kartı: Grafiksiz, sadece rakam odaklı */
+    /* Ana Kart Tasarımı */
     .data-card {
         background: #1e222d;
         border: 1px solid #2a2e39;
-        border-radius: 12px;
-        padding: 25px;
-        margin-bottom: 20px;
+        border-radius: 16px;
+        padding: 30px;
+        margin: 20px auto;
         text-align: center;
-        max-width: 700px;
-        margin-left: auto;
-        margin-right: auto;
+        max-width: 800px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
-    .symbol-name { font-size: 2rem; font-weight: 800; color: #3772ff; margin-bottom: 10px; }
-    .price-now { font-size: 3rem; font-weight: 700; margin: 10px 0; }
-    .change-badge { font-size: 1.2rem; font-weight: bold; padding: 5px 15px; border-radius: 30px; display: inline-block; }
-    .details-row { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; }
+    .symbol-name { font-size: 2.2rem; font-weight: 800; color: #3772ff; margin-bottom: 5px; }
+    .price-now { font-size: 3.5rem; font-weight: 700; margin: 15px 0; letter-spacing: -1px; }
+    
+    /* Senin paylaştığın Details Row yapısının CSS karşılığı */
+    .details-row { 
+        display: flex; 
+        justify-content: space-around; 
+        margin-top: 25px; 
+        border-top: 1px solid rgba(255,255,255,0.1); 
+        padding-top: 20px; 
+    }
     .detail-item { flex: 1; }
-    .detail-label { font-size: 0.8rem; color: #848e9c; }
-    .detail-value { font-size: 1.1rem; font-weight: 600; color: #ffffff; }
+    .detail-label { font-size: 0.9rem; color: #848e9c; margin-bottom: 8px; text-transform: uppercase; }
+    .detail-value { font-size: 1.3rem; font-weight: 600; color: #ffffff; }
 
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ VE YAN PANEL (SIDEBAR)
-dil_ayarlari = {
+# 2. DİL VE SIDEBAR (YAN PANEL) SİSTEMİ
+dil_paketleri = {
     "Türkçe": {
         "baslik": "BORSA PRO TERMİNAL",
-        "ayar": "⚙️ Ayarlar",
-        "dil": "Dil Seçimi",
+        "ayar": "⚙️ Terminal Ayarları",
         "para": "Para Birimi",
-        "yenile": "Otomatik Yenile (15sn)",
-        "ara": "Hisse Ara (THYAO.IS, BTC-USD, AAPL...)",
+        "yenile": "Otomatik Güncelle (15sn)",
+        "ara": "Hisse veya Kripto Ara...",
         "kapanis": "Dünkü Kapanış",
-        "guncel": "Güncel Fiyat",
         "son_24": "Son 24 Saat Özeti",
-        "hata": "Veri bulunamadı"
+        "guncel": "Anlık Fiyat",
+        "hata": "Sembol bulunamadı veya veri çekilemiyor."
     },
     "English": {
         "baslik": "STOCK PRO TERMINAL",
-        "ayar": "⚙️ Settings",
-        "dil": "Language Selection",
-        "para": "Currency",
+        "ayar": "⚙️ Terminal Settings",
+        "para": "Currency Selection",
         "yenile": "Auto Refresh (15s)",
-        "ara": "Search Symbol (AAPL, BTC-USD...)",
+        "ara": "Search Stocks or Crypto...",
         "kapanis": "Prev. Close",
-        "guncel": "Current Price",
         "son_24": "Last 24h Summary",
-        "hata": "Data not found"
+        "guncel": "Live Price",
+        "hata": "Symbol not found or data error."
     }
 }
 
 with st.sidebar:
-    # Dil Seçimi (En Üstte)
-    secili_dil = st.selectbox("Language / Dil", ["Türkçe", "English"])
-    D = dil_ayarlari[secili_dil]
+    # Dil seçimi tüm panelin dilini belirler
+    secilen_dil = st.selectbox("Language / Dil", ["Türkçe", "English"])
+    D = dil_paketleri[secilen_dil]
     
     st.divider()
     st.markdown(f"### {D['ayar']}")
-    
-    # Para Birimi Seçimi
     para_birimi = st.radio(D["para"], ["₺ TRY", "$ USD"])
-    
-    # Yenileme Seçeneği
     oto_taze = st.checkbox(D["yenile"], value=True)
     
     st.divider()
-    if secili_dil == "Türkçe":
-        st.caption("BIST hisseleri için .IS ekleyin.")
-    else:
-        st.caption("Add .IS for Istanbul Stocks.")
+    st.info("BIST: THYAO.IS | NASDAQ: AAPL | Kripto: BTC-USD")
 
-# 3. VERİ MOTORU (KUR HESAPLAMA)
+# 3. VERİ MOTORU
 @st.cache_data(ttl=600)
-def get_usd_rate():
+def get_usd():
     try: return float(yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1])
-    except: return 34.55
-usd_kuru = get_usd_rate()
+    except: return 34.40
+usd_kuru = get_usd()
 
 # 4. ANA EKRAN
-st.markdown(f"<h1 style='text-align: center;'>{D['baslik']}</h1>", unsafe_allow_html=True)
-
+st.markdown(f"<h1 style='text-align: center; color: #ffffff;'>{D['baslik']}</h1>", unsafe_allow_html=True)
 search_input = st.text_input("", placeholder=D["ara"])
 symbols = [s.strip().upper() for s in search_input.split(",") if s.strip()]
 
-# 5. VERİ GÖSTERİMİ (GRAFİKSİZ VE TEMİZ)
+# 5. VERİ GÖSTERİMİ
 if not symbols:
-    st.markdown(f"<div style='text-align: center; padding: 50px; color: #434651;'>{D['ara']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align: center; padding: 100px; color: #434651;'>{D['ara']}</div>", unsafe_allow_html=True)
 else:
     for sym in symbols:
         try:
@@ -107,39 +103,35 @@ else:
             data = ticker.history(period="2d")
             if data.empty: continue
             
-            fiyat_simdi = data['Close'].iloc[-1]
-            fiyat_once = data['Close'].iloc[-2]
-            degisim = ((fiyat_simdi - fiyat_once) / fiyat_once) * 100
+            p_now = data['Close'].iloc[-1]
+            p_prev = data['Close'].iloc[-2]
+            change = ((p_now - p_prev) / p_prev) * 100
             
-            # Para Birimi Dönüşümü
+            # Kur Hesaplama
             is_bist = sym.endswith(".IS")
-            birim_isareti = "₺" if "TRY" in para_birimi else "$"
+            unit = "₺" if "TRY" in para_birimi else "$"
             
-            # Hesaplama Mantığı
-            g_simdi = fiyat_simdi * usd_kuru if ("TRY" in para_birimi and not is_bist) else (fiyat_simdi / usd_kuru if ("USD" in para_birimi and is_bist) else fiyat_simdi)
-            g_once = fiyat_once * usd_kuru if ("TRY" in para_birimi and not is_bist) else (fiyat_once / usd_kuru if ("USD" in para_birimi and is_bist) else fiyat_once)
+            # Dönüşüm Mantığı
+            disp_now = p_now * usd_kuru if ("TRY" in para_birimi and not is_bist) else (p_now / usd_kuru if ("USD" in para_birimi and is_bist) else p_now)
+            disp_prev = p_prev * usd_kuru if ("TRY" in para_birimi and not is_bist) else (p_prev / usd_kuru if ("USD" in para_birimi and is_bist) else p_prev)
 
-            # MODERN VERİ KARTI (GRAFİK YOK)
-            color = "#00e676" if degisim >= 0 else "#ff1744"
-            arrow = "▲" if degisim >= 0 else "▼"
+            # GÖRSELLEŞTİRME (Tam istediğin HTML yapısı ile)
+            color = "#00e676" if change >= 0 else "#ff1744"
             
             st.markdown(f"""
                 <div class="data-card">
                     <div class="symbol-name">{sym}</div>
-                    <div class="price-now">{g_simdi:,.2f} {birim_isareti}</div>
-                    <div class="change-badge" style="background: {color}15; color: {color}; border: 1px solid {color}44;">
-                        {arrow} {degisim:+.2f}%
-                    </div>
+                    <div class="price-now">{disp_now:,.2f} {unit}</div>
                     
                     <div class="details-row">
                         <div class="detail-item">
                             <div class="detail-label">{D['kapanis']}</div>
-                            <div class="detail-value">{g_once:,.2f} {birim_isareti}</div>
+                            <div class="detail-value">{disp_prev:,.2f} {unit}</div>
                         </div>
                         <div style="width:1px; background: rgba(255,255,255,0.1);"></div>
                         <div class="detail-item">
                             <div class="detail-label">{D['son_24']}</div>
-                            <div class="detail-value" style="color:{color}">{degisim:+.2f}%</div>
+                            <div class="detail-value" style="color:{color}">{change:+.2f}%</div>
                         </div>
                     </div>
                 </div>
@@ -148,7 +140,7 @@ else:
         except:
             st.error(f"{sym}: {D['hata']}")
 
-# 6. OTO YENİLEME
+# 6. AUTO REFRESH
 if oto_taze:
     time.sleep(15)
     st.rerun()
