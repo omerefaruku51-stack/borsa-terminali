@@ -27,8 +27,20 @@ st.markdown("""
         background: #2a2e39; padding: 4px 15px; font-size: 0.8rem;
         font-weight: bold; color: #848e9c; margin-top: 10px;
     }
-    /* Checkbox'ın yanındaki gereksiz boşluğu daraltalım */
-    [data-testid="stHorizontalBlock"] { align-items: center; }
+    
+    /* Milimetrik Hizalama Ayarı */
+    .aligned-text {
+        display: inline-block;
+        padding-top: 5px; /* Yazıyı aşağı iterek kutucukla hizalar */
+        font-size: 0.9rem;
+        vertical-align: middle;
+    }
+    
+    /* Sidebar içindeki sütunların dikey hizalanması */
+    [data-testid="stHorizontalBlock"] {
+        align-items: center;
+    }
+    
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -47,7 +59,7 @@ DIL_VERISI = {
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - KUTUCUK SOLDA, YAZI SAĞDA
+# 3. YAN PANEL (SIDEBAR) - TAM HİZALAMA
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_language")
     D = DIL_VERISI[lang]
@@ -59,13 +71,13 @@ with st.sidebar:
     
     st.divider()
 
-    # OTOMATİK YENİLEME - KUTUCUK SOLDA, YAZI SAĞDA
-    # Küçük bir sütun kutucuk için, geniş sütun yazı için
+    # KUTUCUK VE YAZI AYNI HİZADA
     c1, c2 = st.columns([0.15, 0.85])
     with c1:
         refresh = st.checkbox("R_Toggle", value=True, label_visibility="collapsed", key="refresh_toggle")
     with c2:
-        st.write(D['yenile'])
+        # HTML ve class kullanarak metni aşağı kaydırdık
+        st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
 # 4. HİSSE LİSTELERİ
 BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
