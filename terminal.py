@@ -40,50 +40,49 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ
-DIL_AYARLARI = {
+# 2. DİL SÖZLÜĞÜ (Sadece içerik için)
+DIL_VERISI = {
     "Türkçe": {
-        "para_birimi": "Para Birimi",
-        "oto_yenile": "Otomatik Yenile (15s)",
-        "ara_placeholder": "Hisse Ara...",
-        "detay_btn": "Grafiği Göster",
-        "tr_bolum": "BIST HİSSELERİ",
-        "us_bolum": "ABD HİSSELERİ",
-        "arama_sonuc": "ARAMA SONUÇLARI",
-        "yukleniyor": "Grafik kütüphanesi yükleniyor..."
+        "para": "Para Birimi / Currency",
+        "yenile": "Otomatik Yenile / Auto Refresh (15s)",
+        "ara": "Hisse Ara...",
+        "detay": "Grafiği Göster",
+        "tr": "BIST HİSSELERİ",
+        "us": "ABD HİSSELERİ",
+        "sonuc": "ARAMA SONUÇLARI"
     },
     "English": {
-        "para_birimi": "Currency",
-        "oto_yenile": "Auto Refresh (15s)",
-        "ara_placeholder": "Search Stock...",
-        "detay_btn": "Show Chart",
-        "tr_bolum": "TURKISH STOCKS",
-        "us_bolum": "US STOCKS",
-        "arama_sonuc": "SEARCH RESULTS",
-        "yukleniyor": "Chart library loading..."
+        "para": "Currency / Para Birimi",
+        "yenile": "Auto Refresh / Otomatik Yenile (15s)",
+        "ara": "Search Stock...",
+        "detay": "Show Chart",
+        "tr": "TURKISH STOCKS",
+        "us": "US STOCKS",
+        "sonuc": "SEARCH RESULTS"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - KEY PARAMETRELERİ EKLENDİ
+# 3. YAN PANEL (SIDEBAR) - SABİT ETİKETLERLE KESİN ÇÖZÜM
 with st.sidebar:
-    # Dil seçimi sabit bir key ile tanımlandı
-    lang_key = st.selectbox("Language / Dil", ["Türkçe", "English"], key="lang_selector")
-    D = DIL_AYARLARI[lang_key]
+    # Dil seçimi sabit kalmalı
+    lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="main_lang_idx")
+    D = DIL_VERISI[lang]
     
     st.divider()
     
-    # Sabit key'ler sayesinde bileşenler üst üste binmez
-    curr = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"], key="currency_radio")
-    refresh = st.checkbox(D["oto_yenile"], value=True, key="refresh_checkbox")
+    # Widget etiketlerini SABİT (Static) yaparak Streamlit'in kafasını karıştırmıyoruz
+    # Sadece seçeneklerin içeriği veya yanındaki metinler dile göre güncelleniyor
+    curr = st.radio("PARA BİRİMİ / CURRENCY", ["₺ TRY", "$ USD"], key="c_radio")
+    refresh = st.checkbox("OTOMATİK YENİLE / AUTO REFRESH", value=True, key="r_check")
 
 # 4. HİSSE LİSTELERİ
 BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
 US_LIST = sorted(["AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN"])
 
 # 5. ARAMA MOTORU
-search_input = st.text_input("", placeholder=D['ara_placeholder'], key="search_bar").upper()
+search_input = st.text_input("", placeholder=D['ara'], key="search_main").upper()
 
-# 6. VERİ VE KUR MOTORU
+# 6. VERİ MOTORU
 @st.cache_data(ttl=3600)
 def get_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
@@ -105,7 +104,6 @@ def render_list(stock_list, is_tr):
             d_now = now * usd_rate if ("TRY" in curr and not is_tr) else (now / usd_rate if ("USD" in curr and is_tr) else now)
             color = "#00e676" if pct >= 0 else "#ff1744"
 
-            # Satır Görünümü
             st.markdown(f"""
             <div class="stock-row">
                 <div class="sym-name">{sym.replace('.IS','')}</div>
@@ -114,24 +112,22 @@ def render_list(stock_list, is_tr):
             </div>
             """, unsafe_allow_html=True)
             
-            with st.expander(D['detay_btn']):
+            with st.expander(D['detay']):
                 if HAS_PLOTLY:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], line=dict(color='#3772ff', width=2), fill='tozeroy', fillcolor='rgba(55, 114, 255, 0.05)'))
                     fig.update_layout(height=140, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(visible=False))
                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info(D["yukleniyor"])
         except: continue
 
-# 7. ANA AKIŞ
+# 7. AKIŞ
 if search_input:
-    st.markdown(f"<div class='market-header'>{D['arama_sonuc']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['sonuc']}</div>", unsafe_allow_html=True)
     render_list(BIST_LIST + US_LIST, True)
 else:
-    st.markdown(f"<div class='market-header'>{D['tr_bolum']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['tr']}</div>", unsafe_allow_html=True)
     render_list(BIST_LIST, True)
-    st.markdown(f"<div class='market-header'>{D['us_bolum']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='market-header'>{D['us']}</div>", unsafe_allow_html=True)
     render_list(US_LIST, False)
 
 if refresh:
