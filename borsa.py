@@ -3,96 +3,96 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. SAYFA VE TASARIM AYARLARI
-st.set_page_config(page_title="Borsa Intelligence", layout="wide", initial_sidebar_state="expanded")
+# 1. SAYFA AYARLARI
+st.set_page_config(page_title="Borsa Intelligence Pro", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
-    [data-testid="stSidebar"] { background-color: #161a25; border-right: 1px solid rgba(255,255,255,0.05); }
+    [data-testid="stSidebar"] { background-color: #161a25; }
     
-    /* Trend Okları */
-    .trend-indicator {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 50px;
-        height: 50px;
+    /* Veri Kutusu Tasarımı */
+    .data-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        font-size: 24px;
-        font-weight: bold;
+        padding: 15px;
+        text-align: center;
     }
-    .up-arrow { background-color: rgba(0, 230, 118, 0.1); color: #00e676; border: 2px solid #00e676; }
-    .down-arrow { background-color: rgba(255, 23, 68, 0.1); color: #ff1744; border: 2px solid #ff1744; }
+    .price-label { font-size: 0.8rem; color: #848e9c; margin-bottom: 5px; }
+    .price-value { font-size: 1.1rem; font-weight: 600; color: #ffffff; }
     
-    .symbol-title { font-size: 1.8rem; font-weight: 700; color: #ffffff; margin-bottom: 5px; }
+    .symbol-title { font-size: 1.8rem; font-weight: 700; color: #3772ff; margin-bottom: 5px; }
     header, footer {visibility: hidden;}
-    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 1.5rem 0; }
+    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 2rem 0; }
+    
+    /* Buton Tasarımı */
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        background-color: #1e222d;
+        color: #3772ff;
+        border: 1px solid #3772ff;
+    }
+    .stButton>button:hover {
+        background-color: #3772ff;
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ (SİDEBAR DAHİL)
+# 2. DİL PAKETLERİ
 dil_ayarlari = {
     "Türkçe": {
-        "ana_baslik": "BORSA INTELLIGENCE",
-        "ayar_baslik": "⚙️ Ayarlar",
-        "dil_sec": "Dil / Language",
-        "para_birimi": "Para Birimi",
-        "oto_yenile": "10sn Otomatik Güncelle",
-        "liste_baslik": "İzleme Listesi",
-        "ara_placeholder": "Sembolleri virgülle ayırın (THYAO.IS, BTC-USD...)",
-        "fiyat_etiket": "Fiyat",
-        "yon_etiket": "Yön",
-        "bos_uyari": "🔍 Listenize bir sembol ekleyerek başlayın.",
+        "ana_baslik": "BORSA INTELLIGENCE PRO",
+        "ayar": "Ayarlar",
+        "dil": "Dil",
+        "para": "Para Birimi",
+        "yenile": "10sn Otomatik Güncelle",
+        "son_24": "Son 24 Saat",
+        "kapanis": "Dünkü Kapanış",
+        "guncel": "Güncel Fiyat",
+        "detay": "Detaylı Grafiği Aç (TradingView)",
+        "ara": "Hisse Ara (THYAO.IS, BTC-USD...)",
         "hata": "Veri bulunamadı"
     },
     "English": {
-        "ana_baslik": "STOCK INTELLIGENCE",
-        "ayar_baslik": "⚙️ Settings",
-        "dil_sec": "Language / Dil",
-        "para_birimi": "Currency",
-        "oto_yenile": "Auto-Refresh 10s",
-        "liste_baslik": "Watchlist",
-        "ara_placeholder": "Separate symbols with commas...",
-        "fiyat_etiket": "Price",
-        "yon_etiket": "Trend",
-        "bos_uyari": "🔍 Add a symbol to your list to start.",
+        "ana_baslik": "STOCK INTELLIGENCE PRO",
+        "ayar": "Settings",
+        "dil": "Language",
+        "para": "Currency",
+        "yenile": "Auto-Refresh 10s",
+        "son_24": "Last 24 Hours",
+        "kapanis": "Prev. Close",
+        "guncel": "Current Price",
+        "detay": "Open Detailed Chart (TradingView)",
+        "ara": "Search (AAPL, NVDA, BTC-USD...)",
         "hata": "Data not found"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) GÜNCELLEMESİ
+# 3. SIDEBAR
 with st.sidebar:
-    # Önce dil seçimini alıyoruz ki diğer her şey ona göre şekillensin
-    temp_lang = st.selectbox("Language Selection", ["Türkçe", "English"], index=0)
-    D = dil_ayarlari[temp_lang]
-    
+    sel_lang = st.selectbox("Language / Dil", ["Türkçe", "English"])
+    D = dil_ayarlari[sel_lang]
     st.divider()
-    st.markdown(f"### {D['ayar_baslik']}")
-    para_birimi = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"])
-    oto_taze = st.checkbox(D["oto_yenile"], value=True)
-    
-    st.divider()
-    if temp_lang == "Türkçe":
-        st.info("BIST hisseleri için sonuna .IS eklemeyi unutmayın.")
-    else:
-        st.info("Add .IS suffix for BIST (Istanbul) stocks.")
+    curr = st.radio(D["para"], ["₺ TRY", "$ USD"])
+    refresh_on = st.checkbox(D["yenile"], value=True)
 
-# 4. ANA EKRAN VE VERİ MOTORU
-st.markdown(f"<h1 style='text-align: center; color: #3772ff;'>{D['ana_baslik']}</h1>", unsafe_allow_html=True)
-
-search_input = st.text_input(D["liste_baslik"], placeholder=D["ara_placeholder"])
-symbols = [s.strip().upper() for s in search_input.split(",") if s.strip()]
-
+# 4. VERİ ÇEKME
 @st.cache_data(ttl=600)
-def get_live_usd():
+def get_usd():
     try: return float(yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1])
     except: return 34.45
-usd_curr = get_live_usd()
+usd_rate = get_usd()
 
-# 5. GÖRSELLEŞTİRME
+st.markdown(f"<h1 style='text-align: center; color: #ffffff;'>{D['ana_baslik']}</h1>", unsafe_allow_html=True)
+search = st.text_input("", placeholder=D["ara"])
+symbols = [s.strip().upper() for s in search.split(",") if s.strip()]
+
+# 5. GÖRÜNTÜLEME
 if not symbols:
-    st.markdown(f"<div style='text-align: center; padding: 50px; color: #434651;'>{D['bos_uyari']}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; padding: 50px; color: #434651;'>İzlemek istediğiniz sembolleri girin.</div>", unsafe_allow_html=True)
 else:
     for sym in symbols:
         try:
@@ -100,41 +100,48 @@ else:
             df = t.history(period="5d")
             if df.empty: continue
             
-            last_p = df['Close'].iloc[-1]
-            prev_c = df['Close'].iloc[-2]
-            change_pct = ((last_p - prev_c) / prev_c) * 100
+            p_now = df['Close'].iloc[-1]
+            p_prev = df['Close'].iloc[-2]
+            change = ((p_now - p_prev) / p_prev) * 100
             
-            # Kur Dönüşüm Mantığı
+            # Kur Çevrimi
             is_bist = sym.endswith(".IS")
-            unit_sym = "₺" if "TRY" in para_birimi else "$"
-            final_p = last_p
-            
-            if "TRY" in para_birimi and not is_bist: final_p *= usd_curr
-            elif "USD" in para_birimi and is_bist: final_p /= usd_curr
+            unit = "₺" if "TRY" in curr else "$"
+            disp_now = p_now * usd_rate if ("TRY" in curr and not is_bist) else (p_now / usd_rate if ("USD" in curr and is_bist) else p_now)
+            disp_prev = p_prev * usd_rate if ("TRY" in curr and not is_bist) else (p_prev / usd_rate if ("USD" in curr and is_bist) else p_prev)
 
-            # Arayüz Kartı
+            # ARAYÜZ
             st.markdown(f"<div class='symbol-title'>{sym}</div>", unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([1, 0.8, 2.5])
+            
+            c1, c2, c3 = st.columns([1.2, 2, 2])
             
             with c1:
-                st.metric(D["fiyat_etiket"], f"{final_p:,.2f} {unit_sym}", f"{change_pct:+.2f}%")
+                st.metric(D["guncel"], f"{disp_now:,.2f} {unit}", f"{change:+.2f}%")
+                # Detaylı Analiz Butonu (TradingView Linki)
+                tv_sym = sym.replace(".IS", "")
+                tv_url = f"https://www.tradingview.com/symbols/{'BIST-' if is_bist else ''}{tv_sym}/"
+                st.link_button(D["detay"], tv_url)
             
             with c2:
-                st.write(f"**{D['yon_etiket']}**")
-                # Ok doğrudan anlık değişime (bugünkü kâr/zarar) bakar
-                if change_pct >= 0:
-                    st.markdown('<div class="trend-indicator up-arrow">▲</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown('<div class="trend-indicator down-arrow">▼</div>', unsafe_allow_html=True)
+                st.markdown(f"**{D['son_24']}**")
+                st.markdown(f"""
+                <div class="data-box">
+                    <div class="price-label">{D['kapanis']}</div>
+                    <div class="price-value">{disp_prev:,.2f} {unit}</div>
+                    <div style="margin: 10px 0; border-top: 1px solid rgba(255,255,255,0.1);"></div>
+                    <div class="price-label">{D['guncel']}</div>
+                    <div class="price-value" style="color:{'#00e676' if change>=0 else '#ff1744'}">{disp_now:,.2f} {unit}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with c3:
-                st.line_chart(df['Close'], height=150)
+                st.line_chart(df['Close'], height=200)
             
             st.markdown("<hr>", unsafe_allow_html=True)
         except:
-            st.warning(f"{sym}: {D['hata']}")
+            st.error(f"{sym}: {D['hata']}")
 
-# 6. AUTO-REFRESH SİSTEMİ
-if oto_taze:
+# 6. REFRESH
+if refresh_on:
     time.sleep(10)
     st.rerun()
