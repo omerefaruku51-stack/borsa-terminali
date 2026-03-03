@@ -36,23 +36,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ (Dinamik İsimlendirme İçin)
+# 2. DİL PAKETLERİ
 DIL = {
     "Türkçe": {
         "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
         "ara": "Ekle (Hisse, Döviz, Altın...)", "ekle": "EKLE",
         "detay": "Grafik", "bos": "Liste boş.",
-        "altin": "Altın", "dolar": "Dolar", "euro": "Euro"
+        "altin": "Altın"
     },
     "English": {
         "para": "Currency", "yenile": "Auto Refresh (15s)",
         "ara": "Add (Stock, Forex, Gold...)", "ekle": "ADD",
         "detay": "Chart", "bos": "List empty.",
-        "altin": "Gold", "dolar": "Dollar", "euro": "Euro"
+        "altin": "Gold"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - TASARIM KESİNLİKLE BOZULMADI
+# 3. YAN PANEL (SIDEBAR) - TASARIM KİLİTLİ
 with st.sidebar:
     lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_lang")
     D = DIL[lang]
@@ -69,7 +69,7 @@ with st.sidebar:
     with c2:
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. TAKİP LİSTESİ (Sadece senin istediğin 4 ana birimle başlar)
+# 4. TAKİP LİSTESİ
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-USD", "GC=F"]
 
@@ -93,16 +93,15 @@ def get_usd():
 usd_val = get_usd()
 
 def get_display_name(sym, current_curr, d_pack):
-    # Dinamik isimlendirme mantığı: Varlık / Para Birimi
-    p_birimi = "TRY" if "TRY" in current_curr else (d_pack["dolar"] if lang=="Türkçe" else "USD")
+    # Dinamik isimlendirme: Artık "USD" kullanıyoruz
+    p_birimi = "TRY" if "TRY" in current_curr else "USD"
     
-    if sym == "USDTRY=X": return f"USD / TRY"
-    if sym == "EURTRY=X": return f"EUR / TRY"
-    if sym == "EURUSD=X": return f"EUR / USD"
+    if sym == "USDTRY=X": return "USD / TRY"
+    if sym == "EURTRY=X": return "EUR / TRY"
+    if sym == "EURUSD=X": return "EUR / USD"
     if sym == "BTC-USD": return f"BTC / {p_birimi}"
     if sym == "GC=F": return f"{d_pack['altin']} / {p_birimi}"
     
-    # Hisse senetleri için
     return sym.replace('.IS','')
 
 def render_item(sym):
@@ -114,11 +113,9 @@ def render_item(sym):
         now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
         pct = ((now - prev) / prev) * 100
         
-        # İsimlendirme
         display_name = get_display_name(sym, curr, D)
-        
-        # Kur Hesaplama
         u_char = "₺" if "TRY" in curr else "$"
+        
         if "TRY" in curr and ".IS" not in sym and "TRY" not in sym:
             d_now = now * usd_val
         elif "USD" in curr and (".IS" in sym or "TRY" in sym):
