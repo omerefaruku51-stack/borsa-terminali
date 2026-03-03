@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# Plotly kontrolü
+# Plotly kontrolü (Hata almamak için)
 try:
     import plotly.graph_objects as go
     HAS_PLOTLY = True
@@ -40,11 +40,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ (Sidebar dahil her şey burada)
+# 2. DİL PAKETLERİ (Sidebar bileşenleri dahil)
 DIL_AYARLARI = {
     "Türkçe": {
-        "sidebar_baslik": "📊 Ayarlar",
-        "dil_sec": "Dil Seçiniz",
         "para_birimi": "Para Birimi",
         "oto_yenile": "Otomatik Yenile (15s)",
         "ara_placeholder": "Hisse Ara...",
@@ -55,8 +53,6 @@ DIL_AYARLARI = {
         "yukleniyor": "Grafik kütüphanesi yükleniyor..."
     },
     "English": {
-        "sidebar_baslik": "📊 Settings",
-        "dil_sec": "Select Language",
         "para_birimi": "Currency",
         "oto_yenile": "Auto Refresh (15s)",
         "ara_placeholder": "Search Stock...",
@@ -68,16 +64,15 @@ DIL_AYARLARI = {
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - DİNAMİK YAPI
+# 3. YAN PANEL (SIDEBAR) - ARTIK DAHA SADE
 with st.sidebar:
-    # Önce sadece dil seçimi (bu sabit kalabilir veya "Language" yazılabilir)
+    # Dil seçimi en üstte
     lang_key = st.selectbox("Language / Dil", ["Türkçe", "English"])
-    D = DIL_AYARLARI[lang_key] # Seçilen dile göre paketi yükle
+    D = DIL_AYARLARI[lang_key]
     
-    st.title(D["sidebar_baslik"]) # Dile göre değişen başlık
-    st.divider()
+    st.divider() # Estetik bir ayrım çizgisi
     
-    # Dile göre değişen ayarlar
+    # Seçilen dile göre başlığı değişen bileşenler
     curr = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"])
     refresh = st.checkbox(D["oto_yenile"], value=True)
 
@@ -107,7 +102,6 @@ def render_list(stock_list, is_tr):
             pct = ((now - prev) / prev) * 100
             
             u_char = "₺" if "TRY" in curr else "$"
-            # Kur hesaplama mantığı
             d_now = now * usd_rate if ("TRY" in curr and not is_tr) else (now / usd_rate if ("USD" in curr and is_tr) else now)
             color = "#00e676" if pct >= 0 else "#ff1744"
 
