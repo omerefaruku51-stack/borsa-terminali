@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# Plotly kontrolü (Hata almamak için)
+# Plotly kontrolü
 try:
     import plotly.graph_objects as go
     HAS_PLOTLY = True
@@ -40,7 +40,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL PAKETLERİ (Sidebar bileşenleri dahil)
+# 2. DİL PAKETLERİ
 DIL_AYARLARI = {
     "Türkçe": {
         "para_birimi": "Para Birimi",
@@ -64,24 +64,24 @@ DIL_AYARLARI = {
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - ARTIK DAHA SADE
+# 3. YAN PANEL (SIDEBAR) - KEY PARAMETRELERİ EKLENDİ
 with st.sidebar:
-    # Dil seçimi en üstte
-    lang_key = st.selectbox("Language / Dil", ["Türkçe", "English"])
+    # Dil seçimi sabit bir key ile tanımlandı
+    lang_key = st.selectbox("Language / Dil", ["Türkçe", "English"], key="lang_selector")
     D = DIL_AYARLARI[lang_key]
     
-    st.divider() # Estetik bir ayrım çizgisi
+    st.divider()
     
-    # Seçilen dile göre başlığı değişen bileşenler
-    curr = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"])
-    refresh = st.checkbox(D["oto_yenile"], value=True)
+    # Sabit key'ler sayesinde bileşenler üst üste binmez
+    curr = st.radio(D["para_birimi"], ["₺ TRY", "$ USD"], key="currency_radio")
+    refresh = st.checkbox(D["oto_yenile"], value=True, key="refresh_checkbox")
 
 # 4. HİSSE LİSTELERİ
 BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
 US_LIST = sorted(["AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN"])
 
 # 5. ARAMA MOTORU
-search_input = st.text_input("", placeholder=D['ara_placeholder']).upper()
+search_input = st.text_input("", placeholder=D['ara_placeholder'], key="search_bar").upper()
 
 # 6. VERİ VE KUR MOTORU
 @st.cache_data(ttl=3600)
