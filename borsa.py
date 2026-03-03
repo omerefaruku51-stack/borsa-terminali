@@ -3,115 +3,134 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. SAYFA AYARLARI
-st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
+# 1. SAYFA AYARLARI VE SİLİKLEŞME KARŞITI TASARIM
+st.set_page_config(page_title="Borsa Pro Terminal", layout="wide", initial_sidebar_state="collapsed")
 
-# --- SİLİKLEŞMEYİ (GRAY-OUT) ZORLA KAPATAN CSS ---
 st.markdown("""
     <style>
-    /* Streamlit'in 'yükleniyor' efektini (blur ve opacity) tamamen devre dışı bırak */
-    .stApp, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"] {
-        opacity: 1 !important;
-        filter: none !important;
-        -webkit-filter: none !important;
+    /* Silikleşmeyi (Gray-out) Engelle */
+    .stApp, [data-testid="stAppViewBlockContainer"] { opacity: 1 !important; filter: none !important; }
+    
+    /* Modern Kart Tasarımı */
+    .stMetric {
+        background-color: #1e222d;
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid #363c4e;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     
-    /* Yazı yazarken veya güncellenirken elemanların soluklaşmasını engelle */
-    div[data-testid="stMarkdownContainer"], .stText, .stMetric, .stGraph {
-        opacity: 1 !important;
+    /* Hisse Başlıkları */
+    .hisse-baslik {
+        font-size: 28px;
+        font-weight: 800;
+        color: #d1d4dc;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 5px;
     }
-
-    /* Sağ üstteki yükleniyor ikonunu gizle */
-    div[data-testid="stStatusWidget"] {
-        display: none !important;
-    }
-
-    /* Tasarım detayları */
-    .stMetric { background-color: #161b22; padding: 15px; border-radius: 12px; border: 1px solid #30363d; }
-    .hisse-baslik { font-size: 24px; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
-    div[data-testid="stExpander"] { border: 1px solid #30363d; border-radius: 12px; margin-bottom: 15px; }
+    
+    /* Grafik Alanı Arka Planı */
+    .stPlotlyChart { background-color: transparent; }
+    
+    /* Alt Bilgi Gizleme */
     header, footer {visibility: hidden;}
+    
+    /* Giriş Kutusu Tasarımı */
+    .stTextInput > div > div > input {
+        background-color: #2a2e39;
+        color: white;
+        border-radius: 10px;
+        border: 1px solid #434651;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL VE AYARLAR
+# 2. DİL VE PARA BİRİMİ FONKSİYONLARI
 dil_destegi = {
     "Türkçe": {
-        "ayar_baslik": "⚙️ AYARLAR",
-        "dil_sec": "Dil Seçiniz",
-        "para_sec": "Para Birimi",
-        "oto_yenile": "10sn Otomatik Güncelle",
-        "ana_baslik": "BORSA TERMİNALİ",
-        "input_etiket": "Sembolleri Girin (Enter'a basın):",
-        "fiyat": "Fiyat",
-        "bos_uyari": "Takip için sembol girin (Örn: THYAO.IS, BTC-USD)"
+        "ana_baslik": "BORSA PRO TERMİNAL",
+        "input_etiket": "İzlenecek Semboller (Örn: THYAO.IS, AAPL, BTC-USD)",
+        "fiyat": "Anlık Fiyat",
+        "durum": "Trend",
+        "yukari": "BOĞA 🚀",
+        "asagi": "AYI 📉",
+        "bos_mesaj": "🔍 İzleme listesi boş. Yukarıdaki kutuya bir sembol yazarak başlayın."
     },
     "English": {
-        "ayar_baslik": "⚙️ SETTINGS",
-        "dil_sec": "Language",
-        "para_sec": "Currency",
-        "oto_yenile": "10s Auto Refresh",
-        "ana_baslik": "STOCK TERMINAL",
-        "input_etiket": "Enter Symbols (Press Enter):",
-        "fiyat": "Price",
-        "bos_uyari": "Enter symbols to start (e.g., AAPL, BTC-USD)"
+        "ana_baslik": "STOCK PRO TERMINAL",
+        "input_etiket": "Symbols to Track (e.g., AAPL, NVDA, BTC-USD)",
+        "fiyat": "Live Price",
+        "durum": "Trend",
+        "yukari": "BULLISH 🚀",
+        "asagi": "BEARISH 📉",
+        "bos_mesaj": "🔍 Watchlist is empty. Type a symbol above to start."
     }
 }
 
+# Yan Panel Ayarları
 with st.sidebar:
-    secilen_dil = st.selectbox("Language / Dil", ["Türkçe", "English"])
-    L = dil_destegi[secilen_dil]
-    st.header(L["ayar_baslik"])
-    secilen_para = st.radio(L["para_sec"], ["₺ TRY", "$ USD"])
+    st.title("⚙️ Ayarlar")
+    dil = st.selectbox("Dil / Language", ["Türkçe", "English"])
+    L = dil_destegi[dil]
+    para_birimi = st.radio("Para Birimi", ["₺ TRY", "$ USD"])
     st.divider()
-    otomatik_yenile = st.checkbox(L["oto_yenile"], value=True)
+    oto_taze = st.checkbox("10sn Otomatik Güncelle", value=True)
 
+# 3. ANA EKRAN
 st.title(f"📈 {L['ana_baslik']}")
 
-# 3. VERİ GİRİŞİ (HİÇBİR VARSAYILAN HİSSE YOK)
-arama_input = st.text_input(L["input_etiket"], value="", key="search_bar")
-hisse_listesi = [h.strip().upper() for h in arama_input.split(",") if h.strip()]
-st.divider()
+# Arama Kutusu (Boş Başlar)
+arama = st.text_input(L["input_etiket"], value="", placeholder="Sembolleri virgülle ayırarak yazın...")
+hisseler = [h.strip().upper() for h in arama.split(",") if h.strip()]
 
-# Kur bilgisi
 @st.cache_data(ttl=600)
-def get_usd_try():
+def kur_getir():
     try: return float(yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1])
-    except: return 34.0
+    except: return 34.20
+usd = kur_getir()
 
-usd_kuru = get_usd_try()
-
-# 4. GÖRÜNTÜLEME ALANI
-if not hisse_listesi:
-    st.info(L["bos_uyari"])
+# 4. VERİ GÖSTERİMİ
+if not hisseler:
+    st.info(L["bos_mesaj"])
 else:
-    # Bu alanın silikleşmemesi için konteynır kullanıyoruz
-    main_area = st.container()
-    for hisse in hisse_listesi:
+    for sembol in hisseler:
         try:
-            ticker = yf.Ticker(hisse)
-            hist = ticker.history(period="1mo")
-            if hist.empty: continue
-
-            fiyat_ham = float(hist['Close'].iloc[-1])
-            ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+            t = yf.Ticker(sembol)
+            df = t.history(period="1mo")
+            if df.empty: continue
             
-            # Para Birimi Hesapla
-            is_bist = ".IS" in hisse
-            simge = "₺" if "TRY" in secilen_para else "$"
-            f_goster = fiyat_ham
-            if "TRY" in secilen_para and not is_bist: f_goster = fiyat_ham * usd_kuru
-            elif "USD" in secilen_para and is_bist: f_goster = fiyat_ham / usd_kuru
+            fiyat_raw = df['Close'].iloc[-1]
+            degisim = ((fiyat_raw - df['Open'].iloc[-1]) / df['Open'].iloc[-1]) * 100
+            ma20 = df['Close'].rolling(window=20).mean().iloc[-1]
+            
+            # Para Birimi Hesaplama
+            is_bist = ".IS" in sembol
+            birim = "₺" if "TRY" in para_birimi else "$"
+            gosterge_fiyat = fiyat_raw
+            if "TRY" in para_birimi and not is_bist: gosterge_fiyat *= usd
+            elif "USD" in para_birimi and is_bist: gosterge_fiyat /= usd
 
-            with main_area.expander(f"{hisse}", expanded=True):
-                c1, c2, c3 = st.columns([1, 1, 2])
-                c1.metric(L["fiyat"], f"{f_goster:,.2f} {simge}")
-                if fiyat_ham > ma20: st.success("🚀")
-                else: st.error("📉")
-                c3.line_chart(hist['Close'].tail(20), height=150)
-        except: continue
+            # Arayüz Kartı
+            with st.container():
+                st.markdown(f'<div class="hisse-baslik">📊 {sembol}</div>', unsafe_allow_html=True)
+                col1, col2, col3 = st.columns([1, 1, 2])
+                
+                col1.metric(L["fiyat"], f"{gosterge_fiyat:,.2f} {birim}", f"{degisim:+.2f}%")
+                
+                if fiyat_raw > ma20:
+                    col2.success(L["yukari"])
+                else:
+                    col2.error(L["asagi"])
+                
+                # Grafik
+                col3.line_chart(df['Close'].tail(15), height=180, use_container_width=True)
+                st.divider()
+        except:
+            st.warning(f"⚠️ {sembol} verisi alınamadı.")
 
-# 5. GÜNCELLEME (Sadece checkbox seçiliyse çalışır)
-if otomatik_yenile:
+# 5. OTO-REFRESH
+if oto_taze:
     time.sleep(10)
     st.rerun()
