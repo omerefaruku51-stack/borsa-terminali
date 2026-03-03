@@ -3,81 +3,55 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. PREMIUM UI AYARLARI
-st.set_page_config(page_title="Borsa Intelligence Pro", layout="wide", initial_sidebar_state="expanded")
+# 1. TEMİZ VE MARKASIZ UI (PLAY STORE UYUMLU)
+st.set_page_config(page_title="Borsa Pro", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     [data-testid="stSidebar"] { background-color: #161a25; }
     
-    /* Modern Veri Kartı - Tam Genişlik */
-    .data-card {
+    /* Tüm grafikleri ve dış bağlantıları engelleyen temiz kart */
+    .clean-card {
         background: #1e222d;
-        border-radius: 15px;
-        padding: 25px;
+        border-radius: 12px;
+        padding: 30px;
         border: 1px solid #2a2e39;
-        margin-bottom: 20px;
-        width: 100%; /* Tam genişlik */
+        text-align: center;
+        max-width: 800px;
+        margin: auto;
     }
     
-    .symbol-header { 
-        font-size: 2.2rem; 
-        font-weight: 800; 
-        color: #ffffff; 
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-    }
-    
-    .price-main { font-size: 2.5rem; font-weight: 700; color: #ffffff; }
-    .price-sub { font-size: 1.1rem; color: #848e9c; }
+    .symbol-text { font-size: 2.5rem; font-weight: 800; color: #3772ff; }
+    .price-big { font-size: 3rem; font-weight: 700; margin: 10px 0; }
+    .change-text { font-size: 1.5rem; font-weight: bold; }
+    .sub-text { color: #848e9c; font-size: 1rem; margin-top: 20px; }
     
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL VE AYARLAR
-D_LIST = {
-    "Türkçe": {
-        "title": "BORSA TERMINAL PRO",
-        "search": "Sembol Arama",
-        "close": "Kapanış",
-        "current": "Güncel",
-        "change": "Değişim",
-        "hata": "Veri bulunamadı"
-    },
-    "English": {
-        "title": "STOCK TERMINAL PRO",
-        "search": "Symbol Search",
-        "close": "Close",
-        "current": "Live",
-        "change": "Change",
-        "hata": "Data not found"
-    }
-}
-
+# 2. AYARLAR
 with st.sidebar:
-    lang = st.selectbox("Language", ["Türkçe", "English"])
-    D = D_LIST[lang]
-    st.divider()
+    st.title("⚙️ Ayarlar")
+    lang = st.selectbox("Dil", ["Türkçe", "English"])
     curr = st.radio("Para Birimi", ["₺ TRY", "$ USD"])
-    auto_ref = st.checkbox("Canlı Akış (15s)", value=True)
+    ref = st.checkbox("Canlı Güncelleme", value=True)
 
-# 3. VERİ MOTORU
-@st.cache_data(ttl=600)
+# 3. VERİ ÇEKME
+@st.cache_data(ttl=60)
 def get_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
     except: return 34.50
 usd = get_rate()
 
-st.title(f"🚀 {D['title']}")
-search = st.text_input(D["search"], placeholder="THYAO.IS, BTC-USD, NVDA...")
+st.markdown("<h1 style='text-align: center;'>BORSA TERMİNALİ</h1>", unsafe_allow_html=True)
+search = st.text_input("Hisse/Kripto Ara", placeholder="Örn: THYAO.IS, BTC-USD")
 symbols = [s.strip().upper() for s in search.split(",") if s.strip()]
 
-# 4. GÖRÜNTÜLEME - KESİN TEMİZLİK
+# 4. GÖRÜNTÜLEME (KESİN OLARAK SADECE RAKAMLAR)
 if not symbols:
-    st.info("İzleme listenize bir sembol ekleyin.")
+    st.info("İzlemek için sembol girin.")
 else:
     for sym in symbols:
         try:
@@ -85,40 +59,28 @@ else:
             df = t.history(period="2d")
             if df.empty: continue
             
-            p_now, p_prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
-            pct = ((p_now - p_prev) / p_prev) * 100
+            now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
+            diff = ((now - prev) / prev) * 100
             
-            # Para Birimi Dönüşümü
             is_b = sym.endswith(".IS")
             u = "₺" if "TRY" in curr else "$"
-            d_now = p_now * usd if ("TRY" in curr and not is_b) else (p_now / usd if ("USD" in curr and is_b) else p_now)
-            d_prev = p_prev * usd if ("TRY" in curr and not is_b) else (p_prev / usd if ("USD" in curr and is_b) else p_prev)
+            d_now = now * usd if ("TRY" in curr and not is_b) else (now / usd if ("USD" in curr and is_b) else now)
+            d_prev = prev * usd if ("TRY" in curr and not is_b) else (prev / usd if ("USD" in curr and is_b) else prev)
 
-            # EKRAN TASARIMI - KESİN TEMİZLİK
-            st.markdown(f"<div class='symbol-header'>{sym}</div>", unsafe_allow_html=True)
-            
-            # Yandaki grafik bloğu (col2) ve içindeki tüm grafik kodları kaldırıldı.
-            # Veri kartı tam genişlikte gösteriliyor.
             st.markdown(f"""
-                <div class="data-card">
-                    <div class="price-sub">{D['current']}</div>
-                    <div class="price-main">{d_now:,.2f} {u}</div>
-                    <div style="color:{'#00e676' if pct>=0 else '#ff1744'}; font-size:1.2rem; font-weight:bold;">
-                        {pct:+.2f}%
+                <div class="clean-card">
+                    <div class="symbol-text">{sym}</div>
+                    <div class="price-big">{d_now:,.2f} {u}</div>
+                    <div class="change-text" style="color:{'#00e676' if diff>=0 else '#ff1744'}">
+                        {'▲' if diff>=0 else '▼'} {diff:+.2f}%
                     </div>
-                    <hr style="opacity:0.1">
-                    <div class="price-sub">{D['close']}</div>
-                    <div style="font-size:1.2rem;">{d_prev:,.2f} {u}</div>
+                    <div class="sub-text">Önceki Kapanış: {d_prev:,.2f} {u}</div>
                 </div>
-                """, unsafe_allow_html=True)
-
-            # O siteyi barındıran Teknik Analiz bloğu (with st.expander) tamamen kaldırıldı.
-                
-            st.markdown("<hr style='opacity:0.1'>", unsafe_allow_html=True)
+                <br>
+            """, unsafe_allow_html=True)
         except:
-            st.error(f"{sym}: {D['hata']}")
+            st.error(f"{sym} verisi çekilemedi.")
 
-# 5. REFRESH
-if auto_ref:
+if ref:
     time.sleep(15)
     st.rerun()
