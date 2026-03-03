@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import time
-from streamlit_components_lowlevel import components
+import streamlit.components.v1 as components
 
 # 1. SAYFA VE TASARIM AYARLARI
 st.set_page_config(page_title="Borsa Intelligence Pro", layout="wide", initial_sidebar_state="expanded")
@@ -24,14 +24,7 @@ st.markdown("""
     
     .symbol-title { font-size: 1.8rem; font-weight: 700; color: #3772ff; margin-bottom: 5px; }
     header, footer {visibility: hidden;}
-    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 2rem 0; }
-    
-    /* Expander Tasarımı */
-    .streamlit-expanderHeader {
-        background-color: #1e222d !important;
-        color: #3772ff !important;
-        border-radius: 8px !important;
-    }
+    hr { border-top: 1px solid rgba(255,255,255,0.05); margin: 1.5rem 0; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -39,18 +32,18 @@ st.markdown("""
 dil_ayarlari = {
     "Türkçe": {
         "ana_baslik": "BORSA INTELLIGENCE PRO",
-        "ayar": "Ayarlar", "dil": "Dil", "para": "Para Birimi",
-        "yenile": "10sn Otomatik Güncelle", "son_24": "Son 24 Saat",
+        "ayar": "Ayarlar", "para": "Para Birimi",
+        "yenile": "15sn Otomatik Güncelle", "son_24": "Son 24 Saat",
         "kapanis": "Dünkü Kapanış", "guncel": "Güncel Fiyat",
-        "detay": "📈 Detaylı Teknik Analiz Grafiğini Göster",
+        "detay": "📈 Detaylı Teknik Analiz Grafiği",
         "ara": "Hisse Ara (THYAO.IS, BTC-USD, AAPL...)", "hata": "Veri bulunamadı"
     },
     "English": {
         "ana_baslik": "STOCK INTELLIGENCE PRO",
-        "ayar": "Settings", "dil": "Language", "para": "Currency",
-        "yenile": "Auto-Refresh 10s", "son_24": "Last 24 Hours",
+        "ayar": "Settings", "para": "Currency",
+        "yenile": "Auto-Refresh 15s", "son_24": "Last 24 Hours",
         "kapanis": "Prev. Close", "guncel": "Current Price",
-        "detay": "📈 Show Detailed Technical Analysis Chart",
+        "detay": "📈 Show Detailed Technical Chart",
         "ara": "Search (AAPL, NVDA, BTC-USD...)", "hata": "Data not found"
     }
 }
@@ -63,7 +56,7 @@ with st.sidebar:
     curr = st.radio(D["para"], ["₺ TRY", "$ USD"])
     refresh_on = st.checkbox(D["yenile"], value=True)
 
-# 4. VERİ ÇEKME
+# 4. KUR VERİSİ
 @st.cache_data(ttl=600)
 def get_usd():
     try: return float(yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1])
@@ -93,7 +86,6 @@ else:
             d_now = p_now * usd_rate if ("TRY" in curr and not is_bist) else (p_now / usd_rate if ("USD" in curr and is_bist) else p_now)
             d_prev = p_prev * usd_rate if ("TRY" in curr and not is_bist) else (p_prev / usd_rate if ("USD" in curr and is_bist) else p_prev)
 
-            # ARAYÜZ KARTI
             st.markdown(f"<div class='symbol-title'>{sym}</div>", unsafe_allow_html=True)
             c1, c2, c3 = st.columns([1.2, 2, 2])
             
@@ -115,20 +107,32 @@ else:
             with c3:
                 st.line_chart(df['Close'], height=180)
 
-            # --- DETAYLI GRAFİK (TRADINGVIEW EMBED) ---
+            # --- TRADINGVIEW ENTEGRASYONU ---
             with st.expander(D["detay"]):
+                # Sembol Formatlama
                 tv_sym = sym.replace(".IS", "")
-                exchange = "BIST" if is_bist else "NASDAQ" # Basitleştirilmiş borsa seçimi
-                if "-" in sym: exchange = "BINANCE" # Kripto ise
+                if is_bist: tv_sym = f"BIST:{tv_sym}"
+                elif "-" in sym: tv_sym = f"BINANCE:{tv_sym.replace('-', '')}"
+                else: tv_sym = f"NASDAQ:{tv_sym}"
                 
-                # TradingView Widget HTML
-                embed_code = f"""
-                <div class="tradingview-widget-container" style="height:500px; width:100%;">
-                  <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76d4d&symbol={exchange}%3A{tv_sym}&interval=H&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Europe%2FIstanbul&studies_overrides={{}}&overrides={{}}&enabled_features=[]&disabled_features=[]&locale=tr&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term={tv_sym}" 
-                  width="100%" height="500" frameborder="0" allowtransparency="true" scrolling="no" allowfullscreen></iframe>
+                # TradingView HTML Widget
+                tv_html = f"""
+                <div style="height:500px;">
+                <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                <script type="text/javascript">
+                new TradingView.widget({{
+                  "width": "100%", "height": 500, "symbol": "{tv_sym}",
+                  "interval": "H", "timezone": "Europe/Istanbul",
+                  "theme": "dark", "style": "1", "locale": "tr",
+                  "toolbar_bg": "#f1f3f6", "enable_publishing": false,
+                  "hide_top_toolbar": false, "allow_symbol_change": true,
+                  "container_id": "tv_chart"
+                }});
+                </script>
+                <div id="tv_chart"></div>
                 </div>
                 """
-                st.components.v1.html(embed_code, height=510)
+                components.html(tv_html, height=520)
             
             st.markdown("<hr>", unsafe_allow_html=True)
         except:
@@ -136,5 +140,5 @@ else:
 
 # 6. REFRESH
 if refresh_on:
-    time.sleep(15) # Detaylı grafik varken süreyi biraz uzatmak performans için iyidir
+    time.sleep(15)
     st.rerun()
