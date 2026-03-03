@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. TASARIM VE STRATEJİ (Sidebar Tasarımı Kilitli)
+# 1. TASARIM VE SIFIRLAMA MANTIĞI
 st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
 
 try:
@@ -11,6 +11,12 @@ try:
     HAS_PLOTLY = True
 except ImportError:
     HAS_PLOTLY = False
+
+# HAYALET VERİLERİ SİLMEK İÇİN SESSION TEMİZLİĞİ (ZORUNLU)
+# Eğer liste istediğimiz gibi değilse, burada listeyi zorla güncelliyoruz.
+TARGET_START = ["USDTRY=X", "EURTRY=X", "BTC-USD"]
+if 'watchlist' not in st.session_state or any(x not in st.session_state.watchlist for x in TARGET_START):
+    st.session_state.watchlist = TARGET_START
 
 st.markdown("""
     <style>
@@ -24,7 +30,7 @@ st.markdown("""
     .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1rem; }
     .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 0.9rem; }
     
-    /* Sidebar Milimetrik Hizalama - Kilitli */
+    /* Sidebar Milimetrik Hizalama */
     .aligned-text { display: inline-block; padding-top: 5px; font-size: 0.9rem; vertical-align: middle; }
     [data-testid="stHorizontalBlock"] { align-items: center; }
     
@@ -60,18 +66,13 @@ with st.sidebar:
     curr = st.radio("C_Select", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="curr_sel")
     st.divider()
     
-    # Kutucuk solda, yazı sağda milimetrik hizalama
     c1, c2 = st.columns([0.15, 0.85])
     with c1:
         refresh = st.checkbox("R_Tog", value=True, label_visibility="collapsed", key="ref_tog")
     with c2:
         st.markdown(f'<span class="aligned-text">{D["yenile"]}</span>', unsafe_allow_html=True)
 
-# 4. TAKİP LİSTESİ (Gram Altın Çıkarıldı)
-if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = ["USDTRY=X", "EURTRY=X", "BTC-USD"]
-
-# 5. EKLEME PANELİ
+# 4. EKLEME PANELİ
 col_input, col_btn = st.columns([0.85, 0.15])
 with col_input:
     new_asset = st.text_input("", placeholder=D['ara'], key="add_input").upper()
@@ -79,12 +80,11 @@ with col_btn:
     st.write("##")
     if st.button(D['ekle'], use_container_width=True):
         if new_asset and new_asset not in st.session_state.watchlist:
-            # BIST otomatik tamamlama
             final_sym = new_asset if any(x in new_asset for x in ["=", "-"]) or "." in new_asset else f"{new_asset}.IS"
             st.session_state.watchlist.append(final_sym)
             st.rerun()
 
-# 6. VERİ VE İSİMLENDİRME MOTORU
+# 5. VERİ VE İSİMLENDİRME
 @st.cache_data(ttl=60)
 def get_usd_rate():
     try: return yf.Ticker("USDTRY=X").history(period="1d")['Close'].iloc[-1]
@@ -100,14 +100,12 @@ def render_item(sym):
         now, prev = df['Close'].iloc[-1], df['Close'].iloc[-2]
         pct = ((now - prev) / prev) * 100
         
-        # İsimlendirme
         p_birimi = "TRY" if "TRY" in curr else "USD"
         if sym == "USDTRY=X": display_name = "USD / TRY"
         elif sym == "EURTRY=X": display_name = "EUR / TRY"
         elif sym == "BTC-USD": display_name = f"BTC / {p_birimi}"
         else: display_name = sym.replace('.IS','')
 
-        # Kur Çevrimi
         u_char = "₺" if "TRY" in curr else "$"
         if "TRY" in curr:
             d_now = now if any(x in sym for x in ["TRY", ".IS"]) else now * usd_val
@@ -137,12 +135,9 @@ def render_item(sym):
                 st.rerun()
     except: pass
 
-# 7. ANA LİSTE
-if st.session_state.watchlist:
-    for item in st.session_state.watchlist:
-        render_item(item)
-else:
-    st.info(D['bos'])
+# 6. ANA LİSTE ÇİZİMİ
+for item in st.session_state.watchlist:
+    render_item(item)
 
 if refresh:
     time.sleep(15)
