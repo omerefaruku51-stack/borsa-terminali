@@ -3,6 +3,9 @@ import yfinance as yf
 import pandas as pd
 import time
 
+# 1. TASARIM VE STRATEJİ
+st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
+
 # Plotly kontrolü
 try:
     import plotly.graph_objects as go
@@ -10,77 +13,60 @@ try:
 except ImportError:
     HAS_PLOTLY = False
 
-# 1. TASARIM AYARLARI
-st.set_page_config(page_title="Borsa Pro Terminal", layout="wide")
-
 st.markdown("""
     <style>
     .stApp { background-color: #0f111a; color: #f0f2f6; }
     .stock-row {
-        background: #1e222d;
-        border-bottom: 1px solid #2a2e39;
-        padding: 8px 15px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        background: #1e222d; border-bottom: 1px solid #2a2e39;
+        padding: 8px 15px; display: flex; justify-content: space-between; align-items: center;
     }
     .sym-name { flex: 2; font-weight: 800; color: #3772ff; font-size: 1rem; }
     .price-val { flex: 2; text-align: right; font-weight: 700; font-size: 1rem; }
     .pct-val { flex: 1.5; text-align: right; font-weight: bold; font-size: 0.9rem; }
-    
     .market-header {
-        background: #2a2e39;
-        padding: 4px 15px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        color: #848e9c;
-        margin-top: 10px;
+        background: #2a2e39; padding: 4px 15px; font-size: 0.8rem;
+        font-weight: bold; color: #848e9c; margin-top: 10px;
     }
     header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DİL SÖZLÜĞÜ (Sadece içerik için)
+# 2. DİL PAKETLERİ
 DIL_VERISI = {
     "Türkçe": {
-        "para": "Para Birimi / Currency",
-        "yenile": "Otomatik Yenile / Auto Refresh (15s)",
-        "ara": "Hisse Ara...",
-        "detay": "Grafiği Göster",
-        "tr": "BIST HİSSELERİ",
-        "us": "ABD HİSSELERİ",
-        "sonuc": "ARAMA SONUÇLARI"
+        "para": "Para Birimi", "yenile": "Otomatik Yenile (15s)",
+        "ara": "Hisse Ara...", "detay": "Grafiği Göster",
+        "tr": "BIST HİSSELERİ", "us": "ABD HİSSELERİ", "sonuc": "ARAMA SONUÇLARI"
     },
     "English": {
-        "para": "Currency / Para Birimi",
-        "yenile": "Auto Refresh / Otomatik Yenile (15s)",
-        "ara": "Search Stock...",
-        "detay": "Show Chart",
-        "tr": "TURKISH STOCKS",
-        "us": "US STOCKS",
-        "sonuc": "SEARCH RESULTS"
+        "para": "Currency", "yenile": "Auto Refresh (15s)",
+        "ara": "Search Stock...", "detay": "Show Chart",
+        "tr": "TURKISH STOCKS", "us": "US STOCKS", "sonuc": "SEARCH RESULTS"
     }
 }
 
-# 3. YAN PANEL (SIDEBAR) - SABİT ETİKETLERLE KESİN ÇÖZÜM
+# 3. YAN PANEL (SIDEBAR) - KESİN ÇÖZÜM
+# Sidebar'daki widget'ları bir "placeholder" içine alarak çiftlemeyi engelliyoruz
 with st.sidebar:
-    # Dil seçimi sabit kalmalı
-    lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="main_lang_idx")
+    # Dil seçimi en üstte ve sabit
+    lang = st.selectbox("Language / Dil", ["Türkçe", "English"], key="app_language")
     D = DIL_VERISI[lang]
-    
     st.divider()
     
-    # Widget etiketlerini SABİT (Static) yaparak Streamlit'in kafasını karıştırmıyoruz
-    # Sadece seçeneklerin içeriği veya yanındaki metinler dile göre güncelleniyor
-    curr = st.radio("PARA BİRİMİ / CURRENCY", ["₺ TRY", "$ USD"], key="c_radio")
-    refresh = st.checkbox("OTOMATİK YENİLE / AUTO REFRESH", value=True, key="r_check")
+    # KİLİT NOKTA: Label'ları dile göre DEĞİŞTİRMİYORUZ (Çiftleme sebebi budur)
+    # Bunun yerine etiketleri boş bırakıp altına markdown ile açıklama yazıyoruz
+    st.write(f"**{D['para']}**")
+    curr = st.radio("Currency Selection", ["₺ TRY", "$ USD"], label_visibility="collapsed", key="currency_selector")
+    
+    st.write(f"**{D['yenile']}**")
+    refresh = st.checkbox("Refresh Toggle", value=True, label_visibility="collapsed", key="refresh_toggle")
 
 # 4. HİSSE LİSTELERİ
 BIST_LIST = sorted(["THYAO.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS", "TUPRS.IS", "SISE.IS", "BIMAS.IS", "AKBNK.IS", "GARAN.IS", "SASA.IS", "HEKTS.IS"])
 US_LIST = sorted(["AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL", "META", "AMD", "NFLX", "COIN"])
 
 # 5. ARAMA MOTORU
-search_input = st.text_input("", placeholder=D['ara'], key="search_main").upper()
+search_input = st.text_input("", placeholder=D['ara'], key="search_input_main").upper()
 
 # 6. VERİ MOTORU
 @st.cache_data(ttl=3600)
@@ -107,7 +93,7 @@ def render_list(stock_list, is_tr):
             st.markdown(f"""
             <div class="stock-row">
                 <div class="sym-name">{sym.replace('.IS','')}</div>
-                <div class="price-val">{d_now:,.2f} {u_char}</div>
+                <div class="price-now">{d_now:,.2f} {u_char}</div>
                 <div class="pct-val" style="color:{color}">{pct:+.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
@@ -120,7 +106,7 @@ def render_list(stock_list, is_tr):
                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         except: continue
 
-# 7. AKIŞ
+# 7. ANA AKIŞ
 if search_input:
     st.markdown(f"<div class='market-header'>{D['sonuc']}</div>", unsafe_allow_html=True)
     render_list(BIST_LIST + US_LIST, True)
